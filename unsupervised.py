@@ -1,3 +1,4 @@
+"""unsupervised MUSE"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -70,8 +71,8 @@ parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum di
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
-parser.add_argument("--src_emb", type=str, default="", help="Reload source embeddings")
-parser.add_argument("--tgt_emb", type=str, default="", help="Reload target embeddings")
+parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
+parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
 
@@ -97,16 +98,14 @@ trainer = Trainer(src_emb, tgt_emb, mapping, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
-"""
-Learning loop for Adversarial Training
-"""
+# Learning loop for Adversarial Training
 if params.adversarial:
     logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
     # training loop
     for n_epoch in range(params.n_epochs):
 
-        logger.info('Starting adversarial training epoch %i...' % n_epoch)
+        logger.info('Starting adversarial training epoch %i...', n_epoch)
         tic = time.time()
         n_words_proc = 0
         stats = {'DIS_COSTS': []}
@@ -126,7 +125,8 @@ if params.adversarial:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
                              for k, v in stats_str if len(stats[k]) > 0]
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                stats_log = ' - '.join(stats_log)
+                logger.info('%06i - %s', n_iter, stats_log)
 
                 # reset
                 tic = time.time()
@@ -140,9 +140,9 @@ if params.adversarial:
         evaluator.eval_dis(to_log)
 
         # JSON log / save best model / end of epoch
-        logger.info("__log__:%s" % json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of epoch %i.\n\n' % n_epoch)
+        logger.info('End of epoch %i.\n\n', n_epoch)
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
@@ -151,9 +151,7 @@ if params.adversarial:
             break
 
 
-"""
-Learning loop for Procrustes Iterative Refinement
-"""
+# Learning loop for Procrustes Iterative Refinement
 if params.n_refinement > 0:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
@@ -162,7 +160,7 @@ if params.n_refinement > 0:
     # training loop
     for n_iter in range(params.n_refinement):
 
-        logger.info('Starting refinement iteration %i...' % n_iter)
+        logger.info('Starting refinement iteration %i...', n_iter)
 
         # build a dictionary from aligned embeddings
         trainer.build_dictionary()
@@ -175,9 +173,9 @@ if params.n_refinement > 0:
         evaluator.all_eval(to_log)
 
         # JSON log / save best model / end of epoch
-        logger.info("__log__:%s" % json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of refinement iteration %i.\n\n' % n_iter)
+        logger.info('End of refinement iteration %i.\n\n', n_iter)
 
 
 # export embeddings

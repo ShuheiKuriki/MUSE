@@ -97,7 +97,7 @@ rm -r SemEval17-Task2/
 
 ## Europarl for sentence retrieval
 # TODO: set to true to activate download of Europarl (slow)
-if false; then
+if true; then
   mkdir -p crosslingual/europarl
   # Tokenize EUROPARL with MOSES
   echo 'Cloning Moses github repository (for tokenization scripts)...'

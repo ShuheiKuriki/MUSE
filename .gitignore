@@ -1,8 +1,11 @@
 # MUSE data and result folders
 
-data/crosslingual/
+data/crosslingual
 data/monolingual/
 dumped/
+vectors/
+*.vec
+joint_align/
 
 # Created by https://www.gitignore.io/api/vim,python
 
@@ -11,6 +14,7 @@ dumped/
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 
 # C extensions
 *.so
@@ -95,6 +99,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+bin/
+*.cfg
 
 # Spyder project settings
 .spyderproject
@@ -122,5 +128,8 @@ Session.vim
 *~
 # auto-generated tag files
 tags
+
+# vscode
+.vscode/
 
 # End of https://www.gitignore.io/api/vim,python
