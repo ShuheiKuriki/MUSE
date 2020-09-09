@@ -1,3 +1,4 @@
+"""muse trainer"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -6,6 +7,7 @@
 #
 
 import os
+import sys
 from logging import getLogger
 import scipy
 import scipy.linalg
@@ -23,7 +25,7 @@ logger = getLogger()
 
 
 class Trainer(object):
-
+    """muse trainer"""
     def __init__(self, src_emb, tgt_emb, mapping, discriminator, params):
         """
         Initialize trainer script.
@@ -90,12 +92,13 @@ class Trainer(object):
         x, y = self.get_dis_xy(volatile=True)
         preds = self.discriminator(Variable(x.data))
         loss = F.binary_cross_entropy(preds, y)
+        # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.data.item())
 
         # check NaN
         if (loss != loss).data.any():
             logger.error("NaN detected (discriminator)")
-            exit()
+            sys.exit()
 
         # optim
         self.dis_optimizer.zero_grad()
@@ -116,12 +119,13 @@ class Trainer(object):
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
         loss = F.binary_cross_entropy(preds, 1 - y)
+        # loss = F.cross_entropy(preds, 1 - y)
         loss = self.params.dis_lambda * loss
 
         # check NaN
         if (loss != loss).data.any():
             logger.error("NaN detected (fool discriminator)")
-            exit()
+            sys.exit()
 
         # optim
         self.map_optimizer.zero_grad()
@@ -196,20 +200,20 @@ class Trainer(object):
         old_lr = self.map_optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
         if new_lr < old_lr:
-            logger.info("Decreasing learning rate: %.8f -> %.8f" % (old_lr, new_lr))
+            logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
             self.map_optimizer.param_groups[0]['lr'] = new_lr
 
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
             if to_log[metric] < self.best_valid_metric:
                 logger.info("Validation metric is smaller than the best: %.5f vs %.5f"
-                            % (to_log[metric], self.best_valid_metric))
+                            , to_log[metric], self.best_valid_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
                 if self.decrease_lr:
                     old_lr = self.map_optimizer.param_groups[0]['lr']
                     self.map_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
                     logger.info("Shrinking the learning rate: %.5f -> %.5f"
-                                % (old_lr, self.map_optimizer.param_groups[0]['lr']))
+                                , old_lr, self.map_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
 
     def save_best(self, to_log, metric):
@@ -220,11 +224,11 @@ class Trainer(object):
         if to_log[metric] > self.best_valid_metric:
             # new best mapping
             self.best_valid_metric = to_log[metric]
-            logger.info('* Best value for "%s": %.5f' % (metric, to_log[metric]))
+            logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the mapping
             W = self.mapping.weight.data.cpu().numpy()
             path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-            logger.info('* Saving the mapping to %s ...' % path)
+            logger.info('* Saving the mapping to %s ...', path)
             torch.save(W, path)
 
     def reload_best(self):
@@ -232,7 +236,7 @@ class Trainer(object):
         Reload the best mapping.
         """
         path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-        logger.info('* Reloading the best model from %s ...' % path)
+        logger.info('* Reloading the best model from %s ...', path)
         # reload the model
         assert os.path.isfile(path)
         to_reload = torch.from_numpy(torch.load(path))

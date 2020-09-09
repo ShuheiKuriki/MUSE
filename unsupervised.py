@@ -27,9 +27,9 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
-parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
-parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
-parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
+parser.add_argument("--exp_path", type=str, default="", help="experiment folder name1")
+parser.add_argument("--exp_name", type=str, default="learning", help="Experiment name")
+parser.add_argument("--exp_id", type=str, default="", help="Experiment filename")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
@@ -71,13 +71,16 @@ parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum di
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
-parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
-parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
+parser.add_argument("--emb_folder", type=str, default="data", help="folder of embedding")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
 
 # parse parameters
 params = parser.parse_args()
+params.exp_id = '{}-{}-unsup'.format(params.src_lang, params.tgt_lang)
+params.src_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.src_lang)
+params.tgt_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.tgt_lang)
+
 
 # check parameters
 assert not params.cuda or torch.cuda.is_available()

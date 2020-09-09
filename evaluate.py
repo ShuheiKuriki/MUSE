@@ -21,16 +21,19 @@ from src.evaluation import Evaluator
 parser = argparse.ArgumentParser(description='Evaluation')
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
-parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
+parser.add_argument("--exp_name", type=str, default="evaluate", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 # data
 parser.add_argument("--src_lang", type=str, default="", help="Source language")
 parser.add_argument("--tgt_lang", type=str, default="", help="Target language")
+parser.add_argument("--third_lang", type=bool_flag, default=False, help="Using third language")
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 # reload pre-trained embeddings
-parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
-parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
+parser.add_argument("--src_emb", type=str, default="", help="Reload source embeddings")
+parser.add_argument("--tgt_emb", type=str, default="", help="Reload target embeddings")
+parser.add_argument("--emb_folder", type=str, default="dumped/learning", help="folder of embedding")
+
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
@@ -38,7 +41,14 @@ parser.add_argument("--normalize_embeddings", type=str, default="", help="Normal
 
 # parse parameters
 params = parser.parse_args()
-
+if params.third_lang:
+    params.src_emb = '{}/{}-en-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.src_lang)
+    params.tgt_emb = '{}/{}-en-unsup/vectors-{}.txt'.format(params.emb_folder, params.tgt_lang, params.tgt_lang)
+    params.exp_id = '{}-{}-en'.format(params.src_lang, params.tgt_lang)
+else:
+    params.src_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.tgt_lang, params.src_lang)
+    params.tgt_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.tgt_lang, params.tgt_lang)
+    params.exp_id = '{}-{}'.format(params.src_lang, params.tgt_lang)
 # check parameters
 assert params.src_lang, "source language undefined"
 assert os.path.isfile(params.src_emb)
