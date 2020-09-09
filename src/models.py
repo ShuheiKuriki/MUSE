@@ -26,13 +26,11 @@ class Discriminator(nn.Module):
         for i in range(self.dis_layers + 1):
             input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
             output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
-            # output_dim = 3 if i == self.dis_layers else self.dis_hid_dim
             layers.append(nn.Linear(input_dim, output_dim))
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
         layers.append(nn.Sigmoid())
-        # layers.append(nn.Softmax())
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):

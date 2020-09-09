@@ -1,4 +1,3 @@
-"""muse utils"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -16,7 +15,6 @@ import inspect
 import argparse
 import subprocess
 import numpy as np
-from datetime import datetime
 import torch
 from torch import optim
 from logging import getLogger
@@ -66,7 +64,7 @@ def initialize_exp(params):
     logger = create_logger(os.path.join(params.exp_path, 'train.log'), vb=params.verbose)
     logger.info('============ Initialized logger ============')
     logger.info('\n'.join('%s: %s' % (k, str(v)) for k, v in sorted(dict(vars(params)).items())))
-    logger.info('The experiment will be stored in %s', params.exp_path)
+    logger.info('The experiment will be stored in %s' % params.exp_path)
     return logger
 
 
@@ -154,15 +152,16 @@ def get_nn_avg_dist(emb, query, knn):
         index.add(emb)
         distances, _ = index.search(query, knn)
         return distances.mean(1)
-    bs = 1024
-    all_distances = []
-    emb = emb.transpose(0, 1).contiguous()
-    for i in range(0, query.shape[0], bs):
-        distances = query[i:i + bs].mm(emb)
-        best_distances, _ = distances.topk(knn, dim=1, largest=True, sorted=True)
-        all_distances.append(best_distances.mean(1).cpu())
-    all_distances = torch.cat(all_distances)
-    return all_distances.numpy()
+    else:
+        bs = 1024
+        all_distances = []
+        emb = emb.transpose(0, 1).contiguous()
+        for i in range(0, query.shape[0], bs):
+            distances = query[i:i + bs].mm(emb)
+            best_distances, _ = distances.topk(knn, dim=1, largest=True, sorted=True)
+            all_distances.append(best_distances.mean(1).cpu())
+        all_distances = torch.cat(all_distances)
+        return all_distances.numpy()
 
 
 def bool_flag(s):
@@ -219,8 +218,8 @@ def get_optimizer(s):
     expected_args = inspect.getargspec(optim_fn.__init__)[0]
     assert expected_args[:2] == ['self', 'params']
     if not all(k in expected_args[2:] for k in optim_params.keys()):
-        raise Exception('Unexpected parameters: expected "%s", got "%s"',
-            str(expected_args[2:]), str(optim_params.keys()))
+        raise Exception('Unexpected parameters: expected "%s", got "%s"' % (
+            str(expected_args[2:]), str(optim_params.keys())))
 
     return optim_fn, optim_params
 
@@ -238,19 +237,16 @@ def get_exp_path(params):
     if not os.path.exists(exp_folder):
         subprocess.Popen("mkdir %s" % exp_folder, shell=True).wait()
     if params.exp_id == '':
-        # chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-        # while True:
-        #     exp_id = ''.join(random.choice(chars) for _ in range(10))
-        #     exp_path = os.path.join(exp_folder, exp_id)
-        #     if not os.path.isdir(exp_path):
-        #         break
-        # exp_id = datetime.now().strftime('%Y%m%d-%H%M%S')
-        exp_path = exp_folder
+        chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+        while True:
+            exp_id = ''.join(random.choice(chars) for _ in range(10))
+            exp_path = os.path.join(exp_folder, exp_id)
+            if not os.path.isdir(exp_path):
+                break
     else:
         exp_path = os.path.join(exp_folder, params.exp_id)
         assert not os.path.isdir(exp_path), exp_path
     # create the dump folder
-    print(exp_path)
     if not os.path.isdir(exp_path):
         subprocess.Popen("mkdir %s" % exp_path, shell=True).wait()
     return exp_path
@@ -292,11 +288,11 @@ def read_txt_embeddings(params, source, full_vocab):
                 if word in word2id:
                     if full_vocab:
                         logger.warning("Word '%s' found twice in %s embedding file"
-                                       , word, 'source' if source else 'target')
+                                       % (word, 'source' if source else 'target'))
                 else:
                     if not vect.shape == (_emb_dim_file,):
                         logger.warning("Invalid dimension (%i) for %s word '%s' in line %i."
-                                       , vect.shape[0], 'source' if source else 'target', word, i)
+                                       % (vect.shape[0], 'source' if source else 'target', word, i))
                         continue
                     assert vect.shape == (_emb_dim_file,), i
                     word2id[word] = len(word2id)
@@ -305,7 +301,7 @@ def read_txt_embeddings(params, source, full_vocab):
                 break
 
     assert len(word2id) == len(vectors)
-    logger.info("Loaded %i pre-trained word embeddings.", len(vectors))
+    logger.info("Loaded %i pre-trained word embeddings." % len(vectors))
 
     # compute new vocabulary / embeddings
     id2word = {v: k for k, v in word2id.items()}
@@ -348,7 +344,7 @@ def load_pth_embeddings(params, source, full_vocab):
     embeddings = data['vectors']
     assert dico.lang == lang
     assert embeddings.size() == (len(dico), params.emb_dim)
-    logger.info("Loaded %i pre-trained word embeddings.", len(dico))
+    logger.info("Loaded %i pre-trained word embeddings." % len(dico))
 
     # select a subset of word embeddings (to deal with casing)
     if not full_vocab:
@@ -372,7 +368,7 @@ def load_bin_embeddings(params, source, full_vocab):
     assert model.get_dimension() == params.emb_dim
     logger.info("Loaded binary model. Generating embeddings ...")
     embeddings = torch.from_numpy(np.concatenate([model.get_word_vector(w)[None] for w in words], 0))
-    logger.info("Generated embeddings for %i words.", len(words))
+    logger.info("Generated embeddings for %i words." % len(words))
     assert embeddings.size() == (len(words), params.emb_dim)
 
     # select a subset of word embeddings (to deal with casing)
@@ -400,13 +396,14 @@ def load_embeddings(params, source, full_vocab=False):
     - `full_vocab == True` means that we load the entire embedding text file,
       before we export the embeddings at the end of the experiment.
     """
-    assert isinstance(source, bool) and isinstance(full_vocab, bool)
+    assert type(source) is bool and type(full_vocab) is bool
     emb_path = params.src_emb if source else params.tgt_emb
     if emb_path.endswith('.pth'):
         return load_pth_embeddings(params, source, full_vocab)
     if emb_path.endswith('.bin'):
         return load_bin_embeddings(params, source, full_vocab)
-    return read_txt_embeddings(params, source, full_vocab)
+    else:
+        return read_txt_embeddings(params, source, full_vocab)
 
 
 def normalize_embeddings(emb, types, mean=None):
@@ -438,13 +435,13 @@ def export_embeddings(src_emb, tgt_emb, params):
         src_path = os.path.join(params.exp_path, 'vectors-%s.txt' % params.src_lang)
         tgt_path = os.path.join(params.exp_path, 'vectors-%s.txt' % params.tgt_lang)
         # source embeddings
-        logger.info('Writing source embeddings to %s ...', src_path)
+        logger.info('Writing source embeddings to %s ...' % src_path)
         with io.open(src_path, 'w', encoding='utf-8') as f:
             f.write(u"%i %i\n" % src_emb.size())
             for i in range(len(params.src_dico)):
                 f.write(u"%s %s\n" % (params.src_dico[i], " ".join('%.5f' % x for x in src_emb[i])))
         # target embeddings
-        logger.info('Writing target embeddings to %s ...', tgt_path)
+        logger.info('Writing target embeddings to %s ...' % tgt_path)
         with io.open(tgt_path, 'w', encoding='utf-8') as f:
             f.write(u"%i %i\n" % tgt_emb.size())
             for i in range(len(params.tgt_dico)):
@@ -454,7 +451,7 @@ def export_embeddings(src_emb, tgt_emb, params):
     if params.export == "pth":
         src_path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.src_lang)
         tgt_path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.tgt_lang)
-        logger.info('Writing source embeddings to %s ...', src_path)
+        logger.info('Writing source embeddings to %s ...' % src_path)
         torch.save({'dico': params.src_dico, 'vectors': src_emb}, src_path)
-        logger.info('Writing target embeddings to %s ...', tgt_path)
+        logger.info('Writing target embeddings to %s ...' % tgt_path)
         torch.save({'dico': params.tgt_dico, 'vectors': tgt_emb}, tgt_path)
