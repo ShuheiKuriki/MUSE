@@ -133,3 +133,5 @@ tags
 .vscode/
 
 # End of https://www.gitignore.io/api/vim,python
+
+*.sh
