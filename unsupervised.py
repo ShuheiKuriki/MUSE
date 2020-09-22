@@ -82,7 +82,7 @@ params.exp_id = '{}-{}-unsup'.format(params.src_lang, params.tgt_lang)
 params.src_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.src_lang)
 params.tgt_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.tgt_lang)
 if params.dammy:
-    params.tgt_emb = '{}/wiki.{}_dammy2.vec'.format(params.emb_folder, params.tgt_lang)
+    params.tgt_emb = '{}/wiki.{}_dammy.vec'.format(params.emb_folder, params.tgt_lang)
     params.exp_name = 'dammy'
 
 # check parameters
