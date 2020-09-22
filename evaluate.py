@@ -27,7 +27,7 @@ parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 # data
 parser.add_argument("--src_lang", type=str, default="", help="Source language")
 parser.add_argument("--tgt_lang", type=str, default="", help="Target language")
-parser.add_argument("--third_lang", type=bool_flag, default=False, help="Using third language")
+parser.add_argument("--third_lang", type=str, default="", help="Using third language")
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 # reload pre-trained embeddings
 parser.add_argument("--src_emb", type=str, default="", help="Reload source embeddings")
@@ -41,14 +41,17 @@ parser.add_argument("--normalize_embeddings", type=str, default="", help="Normal
 
 # parse parameters
 params = parser.parse_args()
-if params.third_lang:
-    params.src_emb = '{}/{}-en-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.src_lang)
-    params.tgt_emb = '{}/{}-en-unsup/vectors-{}.txt'.format(params.emb_folder, params.tgt_lang, params.tgt_lang)
-    params.exp_id = '{}-{}-en'.format(params.src_lang, params.tgt_lang)
-else:
+if params.third_lang != '':
+    params.src_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.third_lang, params.src_lang)
+    params.tgt_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.tgt_lang, params.third_lang, params.tgt_lang)
+    params.exp_id = '{}-{}-{}'.format(params.src_lang, params.tgt_lang, params.third_lang)
+elif params.tgt_lang != '':
     params.src_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.tgt_lang, params.src_lang)
     params.tgt_emb = '{}/{}-{}-unsup/vectors-{}.txt'.format(params.emb_folder, params.src_lang, params.tgt_lang, params.tgt_lang)
     params.exp_id = '{}-{}'.format(params.src_lang, params.tgt_lang)
+else:
+    params.src_emb = 'data/wiki.{}.vec'.format(params.src_lang)
+    params.exp_id = '{}'.format(params.src_lang)
 # check parameters
 assert params.src_lang, "source language undefined"
 assert os.path.isfile(params.src_emb)
