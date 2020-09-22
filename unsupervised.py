@@ -30,6 +30,7 @@ parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:deb
 parser.add_argument("--exp_path", type=str, default="", help="experiment folder name1")
 parser.add_argument("--exp_name", type=str, default="learning", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment filename")
+parser.add_argument("--dammy", type=bool_flag, default=False, help="Experiment on dammy lang")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
@@ -80,7 +81,9 @@ params = parser.parse_args()
 params.exp_id = '{}-{}-unsup'.format(params.src_lang, params.tgt_lang)
 params.src_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.src_lang)
 params.tgt_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.tgt_lang)
-
+if params.dammy:
+    params.tgt_emb = '{}/wiki.{}_dammy2.vec'.format(params.emb_folder, params.tgt_lang)
+    params.exp_name = 'dammy'
 
 # check parameters
 assert not params.cuda or torch.cuda.is_available()
