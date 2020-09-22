@@ -30,7 +30,7 @@ class Discriminator(nn.Module):
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
-        layers.append(nn.Sigmoid())
+        layers.append(nn.Softmax())
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -56,6 +56,13 @@ def build_model(params, with_dis):
         tgt_emb.weight.data.copy_(_tgt_emb)
     else:
         tgt_emb = None
+    if params.thirh_lang:
+        thirh_dico, _thirh_emb = load_embeddings(params, source=False)
+        params.thirh_dico = thirh_dico
+        thirh_emb = nn.Embedding(len(thirh_dico), params.emb_dim, sparse=True)
+        thirh_emb.weight.data.copy_(_thirh_emb)
+    else:
+        thirh_emb = None
 
     # mapping
     mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)

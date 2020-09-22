@@ -89,7 +89,7 @@ class Trainer(object):
         # loss
         x, y = self.get_dis_xy(volatile=True)
         preds = self.discriminator(Variable(x.data))
-        loss = F.binary_cross_entropy(preds, y)
+        loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.data.item())
 
         # check NaN
@@ -115,7 +115,7 @@ class Trainer(object):
         # loss
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
-        loss = F.binary_cross_entropy(preds, 1 - y)
+        loss = F.cross_entropy(preds, 1 - y)
         loss = self.params.dis_lambda * loss
 
         # check NaN
