@@ -24,22 +24,25 @@ logger = getLogger()
 
 class Trainer(object):
 
-    def __init__(self, src_emb, tgt_emb, mapping, discriminator, params):
+    def __init__(self, src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator, params):
         """
         Initialize trainer script.
         """
+        
         self.src_emb = src_emb
         self.tgt_emb = tgt_emb
+        self.third_emb = third_emb
         self.src_dico = params.src_dico
         self.tgt_dico = getattr(params, 'tgt_dico', None)
-        self.mapping = mapping
+        self.src_mapping = src_mapping
+        self.tgt_mapping = tgt_mapping
         self.discriminator = discriminator
         self.params = params
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            self.map_optimizer = optim_fn(mapping.parameters(), **optim_params)
+            self.map_optimizer = optim_fn(list(src_mapping.parameters())+list(tgt_mapping.parameters()), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -61,21 +64,26 @@ class Trainer(object):
         assert mf <= min(len(self.src_dico), len(self.tgt_dico))
         src_ids = torch.LongTensor(bs).random_(len(self.src_dico) if mf == 0 else mf)
         tgt_ids = torch.LongTensor(bs).random_(len(self.tgt_dico) if mf == 0 else mf)
+        third_ids = torch.LongTensor(bs).random_(len(self.third_dico) if mf == 0 else mf)
         if self.params.cuda:
             src_ids = src_ids.cuda()
             tgt_ids = tgt_ids.cuda()
+            third_ids = third_ids.cuda()
 
         # get word embeddings
         src_emb = self.src_emb(Variable(src_ids, volatile=True))
         tgt_emb = self.tgt_emb(Variable(tgt_ids, volatile=True))
-        src_emb = self.mapping(Variable(src_emb.data, volatile=volatile))
-        tgt_emb = Variable(tgt_emb.data, volatile=volatile)
+        third_emb = self.third_emb(Variable(third_ids, volatile=True))
+        src_emb = self.src_mapping(Variable(src_emb.data, volatile=volatile))
+        tgt_emb = self.tgt_mapping(Variable(tgt_emb.data, volatile=volatile))
+        third_emb = Variable(third_emb.data, volatile=volatile)
 
         # input / target
-        x = torch.cat([src_emb, tgt_emb], 0)
-        y = torch.FloatTensor(2 * bs).zero_()
-        y[:bs] = 1 - self.params.dis_smooth
-        y[bs:] = self.params.dis_smooth
+        x = torch.cat([src_emb, tgt_emb, third_emb], 0)
+        y = torch.zeros(3 * bs, dtype=torch.int64)
+        y[:bs] = 0
+        y[bs:2*bs] = 1
+        y[2*bs:] = 2
         y = Variable(y.cuda() if self.params.cuda else y)
 
         return x, y
@@ -115,7 +123,7 @@ class Trainer(object):
         # loss
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
-        loss = F.cross_entropy(preds, 1 - y)
+        loss = -F.cross_entropy(preds, y)
         loss = self.params.dis_lambda * loss
 
         # check NaN
@@ -161,31 +169,42 @@ class Trainer(object):
         Build a dictionary from aligned embeddings.
         """
         src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_emb.weight.data
+        tgt_emb = self.mapping(self.tgt_emb.weight).data
+        third_emb = self.mapping(self.third_emb.weight).data
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
-        self.dico = build_dictionary(src_emb, tgt_emb, self.params)
+        third_emb = third_emb / third_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
+        self._src_dico = build_dictionary(src_emb, third_emb, self.params)
+        self._tgt_dico = build_dictionary(src_emb, third_emb, self.params)
 
     def procrustes(self):
         """
         Find the best orthogonal matrix mapping using the Orthogonal Procrustes problem
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
-        A = self.src_emb.weight.data[self.dico[:, 0]]
-        B = self.tgt_emb.weight.data[self.dico[:, 1]]
-        W = self.mapping.weight.data
-        M = B.transpose(0, 1).mm(A).cpu().numpy()
-        U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
-        W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
+        A = self.src_emb.weight.data[self._src_dico[:, 0]]
+        B = self.tgt_emb.weight.data[self._tgt_dico[:, 0]]
+        C1 = self.third_emb.weight.data[self._src_dico[:, 1]]
+        C2 = self.third_emb.weight.data[self._tgt_dico[:, 1]]
+        W1 = self.src_mapping.weight.data
+        W2 = self.tgt_mapping.weight.data
+        M1 = C1.transpose(0, 1).mm(A).cpu().numpy()
+        M2 = C2.transpose(0, 1).mm(B).cpu().numpy()
+        U1, S1, V_t1 = scipy.linalg.svd(M1, full_matrices=True)
+        U2, S2, V_t2 = scipy.linalg.svd(M2, full_matrices=True)
+        W1.copy_(torch.from_numpy(U1.dot(V_t1)).type_as(W1))
+        W2.copy_(torch.from_numpy(U2.dot(V_t2)).type_as(W2))
 
     def orthogonalize(self):
         """
         Orthogonalize the mapping.
         """
         if self.params.map_beta > 0:
-            W = self.mapping.weight.data
+            W1 = self.src_mapping.weight.data
+            W2 = self.tgt_mapping.weight.data
             beta = self.params.map_beta
-            W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
+            W1.copy_((1 + beta) * W1 - beta * W1.mm(W1.transpose(0, 1).mm(W1)))
+            W2.copy_((1 + beta) * W2 - beta * W2.mm(W2.transpose(0, 1).mm(W2)))
 
     def update_lr(self, to_log, metric):
         """

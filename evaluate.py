@@ -25,8 +25,9 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 # data
-parser.add_argument("--src_lang", type=str, default="", help="Source language")
-parser.add_argument("--tgt_lang", type=str, default="", help="Target language")
+parser.add_argument("--src_lang", type=str, default='en', help="Source language")
+parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
+parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 # reload pre-trained embeddings
 parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")

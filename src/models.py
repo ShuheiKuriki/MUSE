@@ -25,7 +25,7 @@ class Discriminator(nn.Module):
         layers = [nn.Dropout(self.dis_input_dropout)]
         for i in range(self.dis_layers + 1):
             input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
-            output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
+            output_dim = 3 if i == self.dis_layers else self.dis_hid_dim
             layers.append(nn.Linear(input_dim, output_dim))
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
@@ -35,7 +35,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        return self.layers(x).view(-1)
+        return self.layers(x).view(-1, 3)
 
 
 def build_model(params, with_dis):
@@ -56,18 +56,21 @@ def build_model(params, with_dis):
         tgt_emb.weight.data.copy_(_tgt_emb)
     else:
         tgt_emb = None
-    if params.thirh_lang:
-        thirh_dico, _thirh_emb = load_embeddings(params, source=False)
-        params.thirh_dico = thirh_dico
-        thirh_emb = nn.Embedding(len(thirh_dico), params.emb_dim, sparse=True)
-        thirh_emb.weight.data.copy_(_thirh_emb)
+    if params.third_lang:
+        third_dico, _third_emb = load_embeddings(params, source=False)
+        params.third_dico = third_dico
+        third_emb = nn.Embedding(len(third_dico), params.emb_dim, sparse=True)
+        third_emb.weight.data.copy_(_third_emb)
     else:
-        thirh_emb = None
+        third_emb = None
 
     # mapping
-    mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
+    src_mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
     if getattr(params, 'map_id_init', True):
-        mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+        src_mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+    tgt_mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
+    if getattr(params, 'map_id_init', True):
+        tgt_mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
 
     # discriminator
     discriminator = Discriminator(params) if with_dis else None
@@ -75,9 +78,12 @@ def build_model(params, with_dis):
     # cuda
     if params.cuda:
         src_emb.cuda()
+        src_mapping.cuda()
         if params.tgt_lang:
             tgt_emb.cuda()
-        mapping.cuda()
+            tgt_mapping.cuda()
+        if params.third_lang:
+            third_emb.cuda()
         if with_dis:
             discriminator.cuda()
 
@@ -85,5 +91,7 @@ def build_model(params, with_dis):
     params.src_mean = normalize_embeddings(src_emb.weight.data, params.normalize_embeddings)
     if params.tgt_lang:
         params.tgt_mean = normalize_embeddings(tgt_emb.weight.data, params.normalize_embeddings)
+    if params.third_lang:
+        params.third_mean = normalize_embeddings(third_emb.weight.data, params.normalize_embeddings)
 
-    return src_emb, tgt_emb, mapping, discriminator
+    return src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator

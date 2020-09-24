@@ -29,23 +29,23 @@ class Evaluator(object):
         """
         self.src_emb = trainer.src_emb
         self.tgt_emb = trainer.tgt_emb
+        self.third_emb = trainer.third_emb
         self.src_dico = trainer.src_dico
         self.tgt_dico = trainer.tgt_dico
-        self.mapping = trainer.mapping
+        self.src_mapping = trainer.src_mapping
+        self.tgt_mapping = trainer.tgt_mapping
         self.discriminator = trainer.discriminator
         self.params = trainer.params
-
+        
     def monolingual_wordsim(self, to_log):
         """
         Evaluation on monolingual word similarity.
         """
         src_ws_scores = get_wordsim_scores(
-            self.src_dico.lang, self.src_dico.word2id,
-            self.mapping(self.src_emb.weight).data.cpu().numpy()
+            self.src_dico.lang, self.src_dico.word2id, self.src_mapping(self.src_emb.weight).data.cpu().numpy()
         )
         tgt_ws_scores = get_wordsim_scores(
-            self.tgt_dico.lang, self.tgt_dico.word2id,
-            self.tgt_emb.weight.data.cpu().numpy()
+            self.tgt_dico.lang, self.tgt_dico.word2id, self.tgt_mapping(self.tgt_emb.weight).data.cpu().numpy()
         ) if self.params.tgt_lang else None
         if src_ws_scores is not None:
             src_ws_monolingual_scores = np.mean(list(src_ws_scores.values()))
@@ -68,12 +68,12 @@ class Evaluator(object):
         """
         src_analogy_scores = get_wordanalogy_scores(
             self.src_dico.lang, self.src_dico.word2id,
-            self.mapping(self.src_emb.weight).data.cpu().numpy()
+            self.src_mapping(self.src_emb.weight).data.cpu().numpy()
         )
         if self.params.tgt_lang:
             tgt_analogy_scores = get_wordanalogy_scores(
                 self.tgt_dico.lang, self.tgt_dico.word2id,
-                self.tgt_emb.weight.data.cpu().numpy()
+                self.tgt_mapping(self.tgt_emb.weight).data.cpu().numpy()
             )
         if src_analogy_scores is not None:
             src_analogy_monolingual_scores = np.mean(list(src_analogy_scores.values()))
@@ -90,8 +90,8 @@ class Evaluator(object):
         """
         Evaluation on cross-lingual word similarity.
         """
-        src_emb = self.mapping(self.src_emb.weight).data.cpu().numpy()
-        tgt_emb = self.tgt_emb.weight.data.cpu().numpy()
+        src_emb = self.src_mapping(self.src_emb.weight).data.cpu().numpy()
+        tgt_emb = self.src_mapping(self.tgt_emb.weight).data.cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
             self.src_dico.lang, self.src_dico.word2id, src_emb,
@@ -109,8 +109,8 @@ class Evaluator(object):
         Evaluation on word translation.
         """
         # mapped word embeddings
-        src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_emb.weight.data
+        src_emb = self.src_mapping(self.src_emb.weight).data
+        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(
@@ -145,8 +145,8 @@ class Evaluator(object):
             return
 
         # mapped word embeddings
-        src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_emb.weight.data
+        src_emb = self.src_mapping(self.src_emb.weight).data
+        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
 
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
@@ -178,8 +178,8 @@ class Evaluator(object):
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_emb.weight.data
+        src_emb = self.src_mapping(self.src_emb.weight).data
+        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 

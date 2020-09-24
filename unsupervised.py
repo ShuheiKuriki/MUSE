@@ -94,8 +94,8 @@ assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 logger = initialize_exp(params)
-src_emb, tgt_emb, mapping, discriminator = build_model(params, True)
-trainer = Trainer(src_emb, tgt_emb, mapping, discriminator, params)
+src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator = build_model(params, True)
+trainer = Trainer(src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator, params)
 evaluator = Evaluator(trainer)
 
 

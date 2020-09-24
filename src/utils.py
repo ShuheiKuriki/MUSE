@@ -357,7 +357,7 @@ def load_pth_embeddings(params, source, full_vocab):
     return dico, embeddings
 
 
-def load_bin_embeddings(params, source, full_vocab):
+def load_bin_embeddings(params, emb_path, full_vocab):
     """
     Reload pretrained embeddings from a fastText binary file.
     """
@@ -384,7 +384,7 @@ def load_bin_embeddings(params, source, full_vocab):
     return dico, embeddings
 
 
-def load_embeddings(params, source, full_vocab=False):
+def load_embeddings(params, i, full_vocab=False):
     """
     Reload pretrained embeddings.
     - `full_vocab == False` means that we load the `params.max_vocab` most frequent words.
@@ -396,14 +396,14 @@ def load_embeddings(params, source, full_vocab=False):
     - `full_vocab == True` means that we load the entire embedding text file,
       before we export the embeddings at the end of the experiment.
     """
-    assert type(source) is bool and type(full_vocab) is bool
-    emb_path = params.src_emb if source else params.tgt_emb
+    ebp_path = params.embpaths[i]
+    type(full_vocab) is bool
     if emb_path.endswith('.pth'):
-        return load_pth_embeddings(params, source, full_vocab)
+        return load_pth_embeddings(params, emb_path, full_vocab)
     if emb_path.endswith('.bin'):
-        return load_bin_embeddings(params, source, full_vocab)
+        return load_bin_embeddings(params, emb_path, full_vocab)
     else:
-        return read_txt_embeddings(params, source, full_vocab)
+        return read_txt_embeddings(params, emb_path, full_vocab)
 
 
 def normalize_embeddings(emb, types, mean=None):
