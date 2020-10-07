@@ -67,10 +67,10 @@ class Trainer(object):
         for i in range(langnum):
             ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
             if self.params.cuda:
-                ids[i].cuda()
+                ids[i] = ids[i].cuda()
         tgt_id = torch.LongTensor(bs).random_(self.params.max_vocab if mf == 0 else mf)
         if self.params.cuda:
-            tgt_id[i].cuda()
+            tgt_id.cuda()
 
         # get word embeddings
         embs = [0]*langnum
@@ -79,10 +79,14 @@ class Trainer(object):
                 embs[i] = self.embs[i](Variable(ids[i]).cuda() if self.params.cuda else Variable(ids[i]))
             for i in range(langnum):
                 embs[i] = self.mappings[i](Variable(embs[i].data).cuda() if self.params.cuda else Variable(embs[i].data))
-            target = self.target(Variable(tgt_id).cuda() if self.params.cuda else Variable(tgt_id))
+        if self.params.cuda:
+            target = self.target(Variable(tgt_id)).data.cuda()
+        else:
+            target = self.target(Variable(tgt_id)).data
         target.requeires_grad = True
         # input / target
-        x = torch.cat(embs+[target], 0)
+        embs.append(target)
+        x = torch.cat(embs, 0)
         y = torch.zeros((langnum+1) * bs, dtype=torch.int64)
         for i in range(langnum+1):
             y[i*bs:(i+1)*bs] = i
