@@ -206,8 +206,8 @@ class Evaluator(object):
         """
         Run all evaluations.
         """
-        for i in range(self.params.langnum-1):
-            for j in range(self.params.langnum-1):
+        for i in range(self.params.langnum):
+            for j in range(self.params.langnum):
                 if i == j:
                     continue
                 print('evaluate', self.params.langs[i], self.params.langs[j])

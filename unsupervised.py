@@ -99,8 +99,8 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-embs, mappings, discriminator = build_model(params, True)
-trainer = Trainer(embs, mappings, discriminator, params)
+embs, target, mappings, discriminator = build_model(params, True)
+trainer = Trainer(embs, target, mappings, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -185,6 +185,6 @@ if params.n_refinement > 0:
 
 
 # export embeddings
-if params.export:
-    trainer.reload_best()
-    trainer.export()
+# if params.export:
+    # trainer.reload_best()
+    # trainer.export()

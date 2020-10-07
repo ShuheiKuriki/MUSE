@@ -1,3 +1,4 @@
+"""モデル構築"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -24,11 +25,12 @@ class Discriminator(nn.Module):
         self.dis_hid_dim = params.dis_hid_dim
         self.dis_dropout = params.dis_dropout
         self.dis_input_dropout = params.dis_input_dropout
+        self.params = params
 
         layers = [nn.Dropout(self.dis_input_dropout)]
         for i in range(self.dis_layers + 1):
             input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
-            output_dim = 3 if i == self.dis_layers else self.dis_hid_dim
+            output_dim = params.langnum+1 if i == self.dis_layers else self.dis_hid_dim
             layers.append(nn.Linear(input_dim, output_dim))
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
@@ -38,7 +40,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        return self.layers(x).view(-1, 3)
+        return self.layers(x).view(-1, self.params.langnum+1)
 
 
 def build_model(params, with_dis):
@@ -48,10 +50,13 @@ def build_model(params, with_dis):
     dicos, _embs = [0]*params.langnum, [0]*params.langnum
     for i in range(params.langnum):
         dicos[i], _embs[i] = load_embeddings(params, i)
+        print(_embs[i].size())
     params.dicos = dicos
     embs = [nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(params.langnum)]
     for i in range(params.langnum):
         embs[i].weight.data.copy_(_embs[i])
+    target = nn.Embedding(params.max_vocab, params.emb_dim, sparse=True)
+    print(target.weight)
 
     # target embeddings
     # if params.tgt_lang:
@@ -70,9 +75,9 @@ def build_model(params, with_dis):
     #     third_emb = None
 
     # mapping
-    mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum-1)]
+    mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum)]
     if getattr(params, 'map_id_init', True):
-        for i in range(params.langnum-1):
+        for i in range(params.langnum):
             mappings[i].weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
     # tgt_mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
     # if getattr(params, 'map_id_init', True):
@@ -85,7 +90,7 @@ def build_model(params, with_dis):
     if params.cuda:
         for i in range(params.langnum):
             embs[i].cuda()
-        for i in range(params.langnum-1):
+        for i in range(params.langnum):
             mappings[i].cuda()
         # if params.tgt_lang:
         #     tgt_emb.cuda()
@@ -104,4 +109,4 @@ def build_model(params, with_dis):
     # if params.third_lang:
         # params.third_mean = normalize_embeddings(third_emb.weight.data, params.normalize_embeddings)
 
-    return embs, mappings, discriminator
+    return embs, target, mappings, discriminator

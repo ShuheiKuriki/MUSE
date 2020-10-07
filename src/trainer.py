@@ -24,12 +24,13 @@ logger = getLogger()
 
 class Trainer(object):
 
-    def __init__(self, embs, mappings, discriminator, params):
+    def __init__(self, embs, target, mappings, discriminator, params):
         """
         Initialize trainer script.
         """
     
         self.embs = embs
+        self.target = target
         self.dicos = params.dicos
         self.mappings = mappings
         self.discriminator = discriminator
@@ -39,7 +40,7 @@ class Trainer(object):
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
             lis = []
-            for i in range(params.langnum-1):
+            for i in range(params.langnum):
                 lis += mappings[i].parameters()
             self.map_optimizer = optim_fn(lis, **optim_params)
         if hasattr(params, 'dis_optimizer'):
@@ -72,15 +73,15 @@ class Trainer(object):
         embs = [0]*langnum
         with torch.no_grad():
             for i in range(langnum):
-                embs[i] = self.embs[i](Variable(ids[i]))
-            for i in range(langnum-1):
-                embs[i] = self.mappings[i](Variable(embs[i].data))
-            embs[-1] = Variable(embs[-1].data)
-
+                embs[i] = self.embs[i](Variable(ids[i]).cuda() if self.params.cuda else Variable(ids[i]))
+            for i in range(langnum):
+                embs[i] = self.mappings[i](Variable(embs[i].data).cuda() if self.params.cuda else Variable(embs[i].data))
+            target = Variable(self.target.data).cuda() if self.params.cuda else Variable(embs[-1].data)
+        target.requeires_grad = True
         # input / target
-        x = torch.cat(embs, 0)
-        y = torch.zeros(langnum * bs, dtype=torch.int64)
-        for i in range(langnum):
+        x = torch.cat(embs+[target], 0)
+        y = torch.zeros((langnum+1) * bs, dtype=torch.int64)
+        for i in range(langnum+1):
             y[i*bs:(i+1)*bs] = i
         y = Variable(y.cuda() if self.params.cuda else y)
 
@@ -228,7 +229,7 @@ class Trainer(object):
                     old_lr = self.map_optimizer.param_groups[0]['lr']
                     self.map_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
                     logger.info("Shrinking the learning rate: %.5f -> %.5f"
-                                % (old_lr, self.map_optimizer.param_groups[0]['lr']))
+                                , old_lr, self.map_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
 
     def save_best(self, to_log, metric):
@@ -279,10 +280,10 @@ class Trainer(object):
         # map source embeddings to the target space
         bs = 4096
         logger.info("Map source embeddings to the target space ...")
-        for j in range(params.langnum-1):
+        for j in range(params.langnum):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = Variable(embs[j][k:k + bs], volatile=True)
-                embs[i][k:k + bs] = self.mappings[i](x.cuda() if params.cuda else x).data.cpu()
+                embs[j][k:k + bs] = self.mappings[j](x.cuda() if params.cuda else x).data.cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)
