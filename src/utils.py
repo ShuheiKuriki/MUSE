@@ -261,7 +261,7 @@ def clip_parameters(model, clip):
             x.data.clamp_(-clip, clip)
 
 
-def read_txt_embeddings(params, source, full_vocab):
+def read_txt_embeddings(params, emb_path, lang, full_vocab):
     """
     Reload pretrained embeddings from a text file.
     """
@@ -269,8 +269,6 @@ def read_txt_embeddings(params, source, full_vocab):
     vectors = []
 
     # load pretrained embeddings
-    lang = params.src_lang if source else params.tgt_lang
-    emb_path = params.src_emb if source else params.tgt_emb
     _emb_dim_file = params.emb_dim
     with io.open(emb_path, 'r', encoding='utf-8', newline='\n', errors='ignore') as f:
         for i, line in enumerate(f):
@@ -279,7 +277,10 @@ def read_txt_embeddings(params, source, full_vocab):
                 assert len(split) == 2
                 assert _emb_dim_file == int(split[1])
             else:
-                word, vect = line.rstrip().split(' ', 1)
+                try:
+                    word, vect = line.rstrip().split(' ', 1)
+                except:
+                    continue
                 if not full_vocab:
                     word = word.lower()
                 vect = np.fromstring(vect, sep=' ')
@@ -287,12 +288,12 @@ def read_txt_embeddings(params, source, full_vocab):
                     vect[0] = 0.01
                 if word in word2id:
                     if full_vocab:
-                        logger.warning("Word '%s' found twice in %s embedding file"
-                                       % (word, 'source' if source else 'target'))
+                        logger.warning("Word '%s' found twice in embedding file"
+                                       , word) #'source' if source else 'target'))
                 else:
                     if not vect.shape == (_emb_dim_file,):
-                        logger.warning("Invalid dimension (%i) for %s word '%s' in line %i."
-                                       % (vect.shape[0], 'source' if source else 'target', word, i))
+                        logger.warning("Invalid dimension (%i) for word '%s' in line %i."
+                                       , vect.shape[0], word, i)#, 'source' if source else 'target'))
                         continue
                     assert vect.shape == (_emb_dim_file,), i
                     word2id[word] = len(word2id)
@@ -333,13 +334,12 @@ def select_subset(word_list, max_vocab):
     return word2id, torch.LongTensor(indexes)
 
 
-def load_pth_embeddings(params, source, full_vocab):
+def load_pth_embeddings(params, emb_path, lang, full_vocab):
     """
     Reload pretrained embeddings from a PyTorch binary file.
     """
     # reload PyTorch binary file
-    lang = params.src_lang if source else params.tgt_lang
-    data = torch.load(params.src_emb if source else params.tgt_emb)
+    data = torch.load(emb_path)
     dico = data['dico']
     embeddings = data['vectors']
     assert dico.lang == lang
@@ -357,13 +357,12 @@ def load_pth_embeddings(params, source, full_vocab):
     return dico, embeddings
 
 
-def load_bin_embeddings(params, emb_path, full_vocab):
+def load_bin_embeddings(params, emb_path, lang, full_vocab):
     """
     Reload pretrained embeddings from a fastText binary file.
     """
     # reload fastText binary file
-    lang = params.src_lang if source else params.tgt_lang
-    model = load_fasttext_model(params.src_emb if source else params.tgt_emb)
+    model = load_fasttext_model(emb_path)
     words = model.get_labels()
     assert model.get_dimension() == params.emb_dim
     logger.info("Loaded binary model. Generating embeddings ...")
@@ -396,14 +395,15 @@ def load_embeddings(params, i, full_vocab=False):
     - `full_vocab == True` means that we load the entire embedding text file,
       before we export the embeddings at the end of the experiment.
     """
-    ebp_path = params.embpaths[i]
+    emb_path = params.embpaths[i]
+    lang = params.langs[i]
     type(full_vocab) is bool
     if emb_path.endswith('.pth'):
-        return load_pth_embeddings(params, emb_path, full_vocab)
+        return load_pth_embeddings(params, emb_path, lang, full_vocab)
     if emb_path.endswith('.bin'):
-        return load_bin_embeddings(params, emb_path, full_vocab)
+        return load_bin_embeddings(params, emb_path, lang, full_vocab)
     else:
-        return read_txt_embeddings(params, emb_path, full_vocab)
+        return read_txt_embeddings(params, emb_path, lang, full_vocab)
 
 
 def normalize_embeddings(emb, types, mean=None):
@@ -424,7 +424,7 @@ def normalize_embeddings(emb, types, mean=None):
     return mean.cpu() if mean is not None else None
 
 
-def export_embeddings(src_emb, tgt_emb, params):
+def export_embeddings(embs, params):
     """
     Export embeddings to a text or a PyTorch file.
     """
@@ -432,26 +432,25 @@ def export_embeddings(src_emb, tgt_emb, params):
 
     # text file
     if params.export == "txt":
-        src_path = os.path.join(params.exp_path, 'vectors-%s.txt' % params.src_lang)
-        tgt_path = os.path.join(params.exp_path, 'vectors-%s.txt' % params.tgt_lang)
-        # source embeddings
-        logger.info('Writing source embeddings to %s ...' % src_path)
-        with io.open(src_path, 'w', encoding='utf-8') as f:
-            f.write(u"%i %i\n" % src_emb.size())
-            for i in range(len(params.src_dico)):
-                f.write(u"%s %s\n" % (params.src_dico[i], " ".join('%.5f' % x for x in src_emb[i])))
+        paths = [0]*(params.langnum-1)
+        for i in range(params.langnum-1):
+            paths[i] = os.path.join(params.exp_path, 'vectors-%s.txt' % params.langs[i])
+            logger.info('Writing source embeddings to %s ...' % paths[i])
+            with io.open(paths[i], 'w', encoding='utf-8') as f:
+                f.write(u"%i %i\n" % embs[i].size())
+                for j in range(len(params.dicos[i])):
+                    f.write(u"%s %s\n" % (params.dicos[i][j], " ".join('%.5f' % x for x in embs[i][j])))
         # target embeddings
-        logger.info('Writing target embeddings to %s ...' % tgt_path)
-        with io.open(tgt_path, 'w', encoding='utf-8') as f:
-            f.write(u"%i %i\n" % tgt_emb.size())
-            for i in range(len(params.tgt_dico)):
-                f.write(u"%s %s\n" % (params.tgt_dico[i], " ".join('%.5f' % x for x in tgt_emb[i])))
+        # logger.info('Writing target embeddings to %s ...' % tgt_path)
+        # with io.open(tgt_path, 'w', encoding='utf-8') as f:
+        #     f.write(u"%i %i\n" % tgt_emb.size())
+        #     for i in range(len(params.tgt_dico)):
+        #         f.write(u"%s %s\n" % (params.tgt_dico[i], " ".join('%.5f' % x for x in tgt_emb[i])))
 
     # PyTorch file
     if params.export == "pth":
-        src_path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.src_lang)
-        tgt_path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.tgt_lang)
-        logger.info('Writing source embeddings to %s ...' % src_path)
-        torch.save({'dico': params.src_dico, 'vectors': src_emb}, src_path)
-        logger.info('Writing target embeddings to %s ...' % tgt_path)
-        torch.save({'dico': params.tgt_dico, 'vectors': tgt_emb}, tgt_path)
+        paths = [0]*(params.langnum-1)
+        for i in range(params.langnum-1):
+            paths[i] = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[i])
+            logger.info('Writing source embeddings to %s ...' % paths[i])
+            torch.save({'dico': params.dicos[i], 'vectors': embs[i]}, paths[i])

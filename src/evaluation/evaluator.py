@@ -27,13 +27,9 @@ class Evaluator(object):
         """
         Initialize evaluator.
         """
-        self.src_emb = trainer.src_emb
-        self.tgt_emb = trainer.tgt_emb
-        self.third_emb = trainer.third_emb
-        self.src_dico = trainer.src_dico
-        self.tgt_dico = trainer.tgt_dico
-        self.src_mapping = trainer.src_mapping
-        self.tgt_mapping = trainer.tgt_mapping
+        self.embs = trainer.embs
+        self.dicos = trainer.dicos
+        self.mappings = trainer.mappings
         self.discriminator = trainer.discriminator
         self.params = trainer.params
         
@@ -44,22 +40,22 @@ class Evaluator(object):
         src_ws_scores = get_wordsim_scores(
             self.src_dico.lang, self.src_dico.word2id, self.src_mapping(self.src_emb.weight).data.cpu().numpy()
         )
-        tgt_ws_scores = get_wordsim_scores(
-            self.tgt_dico.lang, self.tgt_dico.word2id, self.tgt_mapping(self.tgt_emb.weight).data.cpu().numpy()
-        ) if self.params.tgt_lang else None
+        # tgt_ws_scores = get_wordsim_scores(
+            # self.tgt_dico.lang, self.tgt_dico.word2id, self.tgt_mapping(self.tgt_emb.weight).data.cpu().numpy()
+        # ) if self.params.tgt_lang else None
         if src_ws_scores is not None:
             src_ws_monolingual_scores = np.mean(list(src_ws_scores.values()))
-            logger.info("Monolingual source word similarity score average: %.5f" % src_ws_monolingual_scores)
+            logger.info("Monolingual source word similarity score average: %.5f", src_ws_monolingual_scores)
             to_log['src_ws_monolingual_scores'] = src_ws_monolingual_scores
             to_log.update({'src_' + k: v for k, v in src_ws_scores.items()})
-        if tgt_ws_scores is not None:
-            tgt_ws_monolingual_scores = np.mean(list(tgt_ws_scores.values()))
-            logger.info("Monolingual target word similarity score average: %.5f" % tgt_ws_monolingual_scores)
+        if src_ws_scores is not None:
+            tgt_ws_monolingual_scores = np.mean(list(src_ws_scores.values()))
+            logger.info("Monolingual target word similarity score average: %.5f", tgt_ws_monolingual_scores)
             to_log['tgt_ws_monolingual_scores'] = tgt_ws_monolingual_scores
-            to_log.update({'tgt_' + k: v for k, v in tgt_ws_scores.items()})
-        if src_ws_scores is not None and tgt_ws_scores is not None:
+            to_log.update({'tgt_' + k: v for k, v in src_ws_scores.items()})
+        if src_ws_scores is not None and src_ws_scores is not None:
             ws_monolingual_scores = (src_ws_monolingual_scores + tgt_ws_monolingual_scores) / 2
-            logger.info("Monolingual word similarity score average: %.5f" % ws_monolingual_scores)
+            logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
             to_log['ws_monolingual_scores'] = ws_monolingual_scores
 
     def monolingual_wordanalogy(self, to_log):
@@ -86,48 +82,46 @@ class Evaluator(object):
             to_log['tgt_analogy_monolingual_scores'] = tgt_analogy_monolingual_scores
             to_log.update({'tgt_' + k: v for k, v in tgt_analogy_scores.items()})
 
-    def crosslingual_wordsim(self, to_log):
+    def crosslingual_wordsim(self, i, j, to_log):
         """
         Evaluation on cross-lingual word similarity.
         """
-        src_emb = self.src_mapping(self.src_emb.weight).data.cpu().numpy()
-        tgt_emb = self.src_mapping(self.tgt_emb.weight).data.cpu().numpy()
+        src_emb = self.mappings[i](self.embs[i].weight).data.cpu().numpy()
+        tgt_emb = self.mappings[j](self.embs[i].weight).data.cpu().numpy()
+        # tgt_emb = self.src_mapping(self.tgt_emb.weight).data.cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
-            self.src_dico.lang, self.src_dico.word2id, src_emb,
-            self.tgt_dico.lang, self.tgt_dico.word2id, tgt_emb,
+        self.dicos[i].lang, self.dicos[i].word2id, src_emb,
+        self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
         )
         if src_tgt_ws_scores is None:
             return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
-        logger.info("Cross-lingual word similarity score average: %.5f" % ws_crosslingual_scores)
+        logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
         to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         to_log.update({'src_tgt_' + k: v for k, v in src_tgt_ws_scores.items()})
 
-    def word_translation(self, to_log):
+    def word_translation(self, i, j, to_log):
         """
         Evaluation on word translation.
         """
         # mapped word embeddings
-        src_emb = self.src_mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
+        src_emb = self.mappings[i](self.embs[i].weight).data
+        tgt_emb = self.mappings[j](self.embs[j].weight).data
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(
-                self.src_dico.lang, self.src_dico.word2id, src_emb,
-                self.tgt_dico.lang, self.tgt_dico.word2id, tgt_emb,
-                method=method,
-                dico_eval=self.params.dico_eval
-            )
+                self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval
+                )
             to_log.update([('%s-%s' % (k, method), v) for k, v in results])
 
-    def sent_translation(self, to_log):
+    def sent_translation(self, i, j, to_log):
         """
         Evaluation on sentence translation.
         Only available on Europarl, for en - {de, es, fr, it} language pairs.
         """
-        lg1 = self.src_dico.lang
-        lg2 = self.tgt_dico.lang
+        lg1 = self.dicos[i].lang
+        lg2 = self.dicos[j].lang
 
         # parameters
         n_keys = 200000
@@ -145,8 +139,8 @@ class Evaluator(object):
             return
 
         # mapped word embeddings
-        src_emb = self.src_mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
+        src_emb = self.mappings[i](self.embs[i].weight).data
+        tgt_emb = self.mappings[j](self.embs[j].weight).data
 
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
@@ -156,8 +150,8 @@ class Evaluator(object):
             # source <- target sentence translation
             results = get_sent_translation_accuracy(
                 self.europarl_data,
-                self.src_dico.lang, self.src_dico.word2id, src_emb,
-                self.tgt_dico.lang, self.tgt_dico.word2id, tgt_emb,
+                self.dicos[i].lang, self.dicos[i].word2id, src_emb,
+                self.dicos[j].lang, self.dicos[j].word2id, tgt_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )
@@ -166,20 +160,20 @@ class Evaluator(object):
             # target <- source sentence translation
             results = get_sent_translation_accuracy(
                 self.europarl_data,
-                self.tgt_dico.lang, self.tgt_dico.word2id, tgt_emb,
-                self.src_dico.lang, self.src_dico.word2id, src_emb,
+                self.dicos[i].lang, self.dicos[i].word2id, tgt_emb,
+                self.dicos[j].lang, self.dicos[j].word2id, src_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )
             to_log.update([('src_to_tgt_%s-%s' % (k, method), v) for k, v in results])
 
-    def dist_mean_cosine(self, to_log):
+    def dist_mean_cosine(self, i, j, to_log):
         """
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.src_mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_mapping(self.tgt_emb.weight).data
+        src_emb = self.mappings[i](self.embs[i].weight).data
+        tgt_emb = self.mappings[j](self.embs[j].weight).data
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
@@ -212,11 +206,16 @@ class Evaluator(object):
         """
         Run all evaluations.
         """
-        self.monolingual_wordsim(to_log)
-        self.crosslingual_wordsim(to_log)
-        self.word_translation(to_log)
-        self.sent_translation(to_log)
-        self.dist_mean_cosine(to_log)
+        for i in range(self.params.langnum-1):
+            for j in range(self.params.langnum-1):
+                if i == j:
+                    continue
+                print('evaluate', self.params.langs[i], self.params.langs[j])
+                # self.monolingual_wordsim(to_log)
+                self.crosslingual_wordsim(i, j, to_log)
+                self.word_translation(i, j, to_log)
+                self.sent_translation(i, j, to_log)
+                self.dist_mean_cosine(i, j, to_log)
 
     def eval_dis(self, to_log):
         """

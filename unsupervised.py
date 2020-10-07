@@ -33,9 +33,9 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
-parser.add_argument("--src_lang", type=str, default='en', help="Source language")
-parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
-parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
+parser.add_argument("--langs", type=str, default='en_es', help="Source language")
+# parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
+# parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 # mapping
@@ -72,8 +72,8 @@ parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum di
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
-parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
-parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
+# parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
+# parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
 
@@ -87,15 +87,20 @@ assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
 assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
-assert os.path.isfile(params.src_emb)
-assert os.path.isfile(params.tgt_emb)
+# assert os.path.isfile(params.src_emb)
+# assert os.path.isfile(params.tgt_emb)
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 logger = initialize_exp(params)
-src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator = build_model(params, True)
-trainer = Trainer(src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator, params)
+params.langs = params.langs.split('_')
+params.langnum = len(params.langs)
+params.embpaths = []
+for i in range(params.langnum):
+    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+embs, mappings, discriminator = build_model(params, True)
+trainer = Trainer(embs, mappings, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -138,11 +143,11 @@ if params.adversarial:
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch})
         evaluator.all_eval(to_log)
-        evaluator.eval_dis(to_log)
+        # evaluator.eval_dis(to_log)
 
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s", json.dumps(to_log))
-        trainer.save_best(to_log, VALIDATION_METRIC)
+        # trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of epoch %i.\n\n', n_epoch)
 
         # update the learning rate (stop if too small)

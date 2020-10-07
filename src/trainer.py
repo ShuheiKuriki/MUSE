@@ -24,25 +24,24 @@ logger = getLogger()
 
 class Trainer(object):
 
-    def __init__(self, src_emb, tgt_emb, third_emb, src_mapping, tgt_mapping, discriminator, params):
+    def __init__(self, embs, mappings, discriminator, params):
         """
         Initialize trainer script.
         """
-        
-        self.src_emb = src_emb
-        self.tgt_emb = tgt_emb
-        self.third_emb = third_emb
-        self.src_dico = params.src_dico
-        self.tgt_dico = getattr(params, 'tgt_dico', None)
-        self.src_mapping = src_mapping
-        self.tgt_mapping = tgt_mapping
+    
+        self.embs = embs
+        self.dicos = params.dicos
+        self.mappings = mappings
         self.discriminator = discriminator
         self.params = params
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            self.map_optimizer = optim_fn(list(src_mapping.parameters())+list(tgt_mapping.parameters()), **optim_params)
+            lis = []
+            for i in range(params.langnum-1):
+                lis += mappings[i].parameters()
+            self.map_optimizer = optim_fn(lis, **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -54,36 +53,35 @@ class Trainer(object):
 
         self.decrease_lr = False
 
-    def get_dis_xy(self, volatile):
+    def get_dis_xy(self):
         """
         Get discriminator input batch / output target.
         """
         # select random word IDs
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
-        assert mf <= min(len(self.src_dico), len(self.tgt_dico))
-        src_ids = torch.LongTensor(bs).random_(len(self.src_dico) if mf == 0 else mf)
-        tgt_ids = torch.LongTensor(bs).random_(len(self.tgt_dico) if mf == 0 else mf)
-        third_ids = torch.LongTensor(bs).random_(len(self.third_dico) if mf == 0 else mf)
-        if self.params.cuda:
-            src_ids = src_ids.cuda()
-            tgt_ids = tgt_ids.cuda()
-            third_ids = third_ids.cuda()
+        langnum = self.params.langnum
+        # assert mf <= min(len(self.src_dico), len(self.tgt_dico))
+        ids = [0]*langnum
+        for i in range(langnum):
+            ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
+            if self.params.cuda:
+                ids[i].cuda()
 
         # get word embeddings
-        src_emb = self.src_emb(Variable(src_ids, volatile=True))
-        tgt_emb = self.tgt_emb(Variable(tgt_ids, volatile=True))
-        third_emb = self.third_emb(Variable(third_ids, volatile=True))
-        src_emb = self.src_mapping(Variable(src_emb.data, volatile=volatile))
-        tgt_emb = self.tgt_mapping(Variable(tgt_emb.data, volatile=volatile))
-        third_emb = Variable(third_emb.data, volatile=volatile)
+        embs = [0]*langnum
+        with torch.no_grad():
+            for i in range(langnum):
+                embs[i] = self.embs[i](Variable(ids[i]))
+            for i in range(langnum-1):
+                embs[i] = self.mappings[i](Variable(embs[i].data))
+            embs[-1] = Variable(embs[-1].data)
 
         # input / target
-        x = torch.cat([src_emb, tgt_emb, third_emb], 0)
-        y = torch.zeros(3 * bs, dtype=torch.int64)
-        y[:bs] = 0
-        y[bs:2*bs] = 1
-        y[2*bs:] = 2
+        x = torch.cat(embs, 0)
+        y = torch.zeros(langnum * bs, dtype=torch.int64)
+        for i in range(langnum):
+            y[i*bs:(i+1)*bs] = i
         y = Variable(y.cuda() if self.params.cuda else y)
 
         return x, y
@@ -95,7 +93,7 @@ class Trainer(object):
         self.discriminator.train()
 
         # loss
-        x, y = self.get_dis_xy(volatile=True)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(Variable(x.data))
         loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.data.item())
@@ -121,7 +119,7 @@ class Trainer(object):
         self.discriminator.eval()
 
         # loss
-        x, y = self.get_dis_xy(volatile=False)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x)
         loss = -F.cross_entropy(preds, y)
         loss = self.params.dis_lambda * loss
@@ -199,12 +197,14 @@ class Trainer(object):
         """
         Orthogonalize the mapping.
         """
+        langnum = self.params.langnum
         if self.params.map_beta > 0:
-            W1 = self.src_mapping.weight.data
-            W2 = self.tgt_mapping.weight.data
+            Ws = [0]*(langnum-1)
+            for i in range(langnum-1):
+                Ws[i] = self.mappings[i].weight.data
             beta = self.params.map_beta
-            W1.copy_((1 + beta) * W1 - beta * W1.mm(W1.transpose(0, 1).mm(W1)))
-            W2.copy_((1 + beta) * W2 - beta * W2.mm(W2.transpose(0, 1).mm(W2)))
+            for i in range(langnum-1):
+                Ws[i].copy_((1 + beta) * Ws[i] - beta * Ws[i].mm(Ws[i].transpose(0, 1).mm(Ws[i])))
 
     def update_lr(self, to_log, metric):
         """
@@ -267,19 +267,22 @@ class Trainer(object):
 
         # load all embeddings
         logger.info("Reloading all embeddings for mapping ...")
-        params.src_dico, src_emb = load_embeddings(params, source=True, full_vocab=True)
-        params.tgt_dico, tgt_emb = load_embeddings(params, source=False, full_vocab=True)
+        embs = [0]*params.langnum
+        for i in range(params.langnum):
+            params.dicos[i], embs[i] = load_embeddings(params, i, full_vocab=True)
 
         # apply same normalization as during training
-        normalize_embeddings(src_emb, params.normalize_embeddings, mean=params.src_mean)
-        normalize_embeddings(tgt_emb, params.normalize_embeddings, mean=params.tgt_mean)
+        for i in range(params.langnum):
+            normalize_embeddings(embs[i], params.normalize_embeddings, mean=params.means[i])
+        # normalize_embeddings(tgt_emb, params.normalize_embeddings, mean=params.tgt_mean)
 
         # map source embeddings to the target space
         bs = 4096
         logger.info("Map source embeddings to the target space ...")
-        for i, k in enumerate(range(0, len(src_emb), bs)):
-            x = Variable(src_emb[k:k + bs], volatile=True)
-            src_emb[k:k + bs] = self.mapping(x.cuda() if params.cuda else x).data.cpu()
+        for j in range(params.langnum-1):
+            for i, k in enumerate(range(0, len(embs[j]), bs)):
+                x = Variable(embs[j][k:k + bs], volatile=True)
+                embs[i][k:k + bs] = self.mappings[i](x.cuda() if params.cuda else x).data.cpu()
 
         # write embeddings to the disk
-        export_embeddings(src_emb, tgt_emb, params)
+        export_embeddings(embs, params)
