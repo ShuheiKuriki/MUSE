@@ -55,7 +55,7 @@ def build_model(params, with_dis):
     embs = [nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(params.langnum)]
     for i in range(params.langnum):
         embs[i].weight.data.copy_(_embs[i])
-    target = nn.Embedding(params.max_vocab, params.emb_dim, sparse=True)
+    target = nn.Embedding(params.max_vocab, params.emb_dim, sparse=True)/params.emb_dim**0.5
     print(target.weight)
 
     # target embeddings
@@ -102,6 +102,7 @@ def build_model(params, with_dis):
 
     # normalize embeddings
     params.means = [normalize_embeddings(embs[i].weight.data, params.normalize_embeddings) for i in range(params.langnum)]
+    params.target_mean = normalize_embeddings(target.weight.data, params.normalize_embeddings)
     # for i in range(params.langnum):
         # params.src_mean = normalize_embeddings(embs[i].weight.data, params.normalize_embeddings)
     # if params.tgt_lang:
