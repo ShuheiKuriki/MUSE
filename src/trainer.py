@@ -24,13 +24,12 @@ logger = getLogger()
 
 class Trainer(object):
 
-    def __init__(self, embs, target, mappings, discriminator, params):
+    def __init__(self, embs, mappings, discriminator, params):
         """
         Initialize trainer script.
         """
-    
+
         self.embs = embs
-        self.target = target
         self.dicos = params.dicos
         self.mappings = mappings
         self.discriminator = discriminator
@@ -40,7 +39,7 @@ class Trainer(object):
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
             lis = []
-            for i in range(params.langnum):
+            for i in range(params.langnum-1):
                 lis += mappings[i].parameters()
             self.map_optimizer = optim_fn(lis, **optim_params)
         if hasattr(params, 'dis_optimizer'):
@@ -68,27 +67,18 @@ class Trainer(object):
             ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
             if self.params.cuda:
                 ids[i] = ids[i].cuda()
-        tgt_id = torch.LongTensor(bs).random_(self.params.max_vocab if mf == 0 else mf)
-        if self.params.cuda:
-            tgt_id.cuda()
 
         # get word embeddings
         embs = [0]*langnum
         with torch.no_grad():
             for i in range(langnum):
                 embs[i] = self.embs[i](Variable(ids[i]).cuda() if self.params.cuda else Variable(ids[i]))
-            for i in range(langnum):
+            for i in range(langnum-1):
                 embs[i] = self.mappings[i](Variable(embs[i].data).cuda() if self.params.cuda else Variable(embs[i].data))
-        if self.params.cuda:
-            target = self.target(Variable(tgt_id)).data.cuda()
-        else:
-            target = self.target(Variable(tgt_id)).data
-        target.requeires_grad = True
         # input / target
-        embs.append(target)
         x = torch.cat(embs, 0)
-        y = torch.zeros((langnum+1) * bs, dtype=torch.int64)
-        for i in range(langnum+1):
+        y = torch.zeros(langnum * bs, dtype=torch.int64)
+        for i in range(langnum):
             y[i*bs:(i+1)*bs] = i
         y = Variable(y.cuda() if self.params.cuda else y)
 
@@ -287,7 +277,7 @@ class Trainer(object):
         # map source embeddings to the target space
         bs = 4096
         logger.info("Map source embeddings to the target space ...")
-        for j in range(params.langnum):
+        for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = Variable(embs[j][k:k + bs], volatile=True)
                 embs[j][k:k + bs] = self.mappings[j](x.cuda() if params.cuda else x).data.cpu()
