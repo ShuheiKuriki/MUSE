@@ -245,33 +245,35 @@ class Evaluator(object):
         Evaluate discriminator predictions and accuracy.
         """
         bs = 128
-        src_preds = []
-        tgt_preds = []
-
+        langnum = self.params.langnum
+        preds_ = [[] for _ in range(langnum)]
+        pred_ = [0]*langnum
         self.discriminator.eval()
 
-        for i in range(0, self.src_emb.num_embeddings, bs):
-            emb = Variable(self.src_emb.weight[i:i + bs].data, volatile=True)
-            preds = self.discriminator(self.mapping(emb))
-            src_preds.extend(preds.data.cpu().tolist())
+        for i in range(langnum):
+            for j in range(0, self.embs[i].num_embeddings, bs):
+                with torch.no_grad():
+                    emb = Variable(self.embs[i].weight[j:j + bs].data)
+                if i < langnum-1:
+                    preds = self.discriminator(self.mappings[i](emb))
+                else:
+                    preds = self.discriminator(emb)
+                preds_[i].extend(preds.data.cpu().tolist())
+            pred_[i] = np.mean([x[i] for x in preds_[i]])
+            # print(preds_[i][0])
 
-        for i in range(0, self.tgt_emb.num_embeddings, bs):
-            emb = Variable(self.tgt_emb.weight[i:i + bs].data, volatile=True)
-            preds = self.discriminator(emb)
-            tgt_preds.extend(preds.data.cpu().tolist())
+            logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
 
-        src_pred = np.mean(src_preds)
-        tgt_pred = np.mean(tgt_preds)
-        logger.info("Discriminator source / target predictions: %.5f / %.5f"
-                    % (src_pred, tgt_pred))
-
-        src_accu = np.mean([x >= 0.5 for x in src_preds])
-        tgt_accu = np.mean([x < 0.5 for x in tgt_preds])
-        dis_accu = ((src_accu * self.src_emb.num_embeddings + tgt_accu * self.tgt_emb.num_embeddings) /
-                    (self.src_emb.num_embeddings + self.tgt_emb.num_embeddings))
-        logger.info("Discriminator source / target / global accuracy: %.5f / %.5f / %.5f"
-                    % (src_accu, tgt_accu, dis_accu))
+        accus = [0]*langnum
+        cnt = 0
+        total = sum([self.embs[i].num_embeddings for i in range(langnum)])
+        for i in range(langnum):
+            accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
+            cnt += accus[i] * self.embs[i].num_embeddings
+            logger.info("Discriminator %s accuracy: %.5f", self.params.langs[i], accus[i])
+        dis_accu = cnt/total
+        logger.info("Discriminator global accuracy: %.5f", accus[i])
 
         to_log['dis_accu'] = dis_accu
-        to_log['dis_src_pred'] = src_pred
-        to_log['dis_tgt_pred'] = tgt_pred
+        # to_log['dis_src_pred'] = pred
+        # to_log['dis_tgt_pred'] = pred

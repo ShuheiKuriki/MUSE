@@ -142,7 +142,7 @@ if params.adversarial:
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch})
         evaluator.all_eval(to_log)
-        # evaluator.eval_dis(to_log)
+        evaluator.eval_dis(to_log)
 
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s", json.dumps(to_log))

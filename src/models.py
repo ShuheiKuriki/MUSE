@@ -8,9 +8,7 @@
 
 import torch
 from torch import nn
-
 from .utils import load_embeddings, normalize_embeddings
-
 
 class Discriminator(nn.Module):
     """
@@ -35,12 +33,15 @@ class Discriminator(nn.Module):
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
-        layers.append(nn.Softmax())
+        layers.append(nn.Softmax(dim=1))
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        return self.layers(x).view(-1, self.params.langnum)
+        output = self.layers(x)
+        # print(torch.mean(output[:32, 0]))
+        # print(torch.mean(output[32:, 1]))
+        return output
 
 
 def build_model(params, with_dis):
