@@ -75,7 +75,7 @@ def build_model(params, with_dis):
     # mapping
     mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum-1)]
     if getattr(params, 'map_id_init', True):
-        for i in range(params.langnum):
+        for i in range(params.langnum-1):
             mappings[i].weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
     # tgt_mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
     # if getattr(params, 'map_id_init', True):

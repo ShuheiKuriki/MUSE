@@ -22,7 +22,6 @@ from src.evaluation import Evaluator
 
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 
-
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
@@ -33,7 +32,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
-parser.add_argument("--langs", type=str, default='en_es', help="Source language")
+parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 # parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
 # parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")

@@ -86,13 +86,19 @@ class Evaluator(object):
         """
         Evaluation on cross-lingual word similarity.
         """
-        src_emb = self.mappings[i](self.embs[i].weight).data.cpu().numpy()
-        tgt_emb = self.mappings[j](self.embs[i].weight).data.cpu().numpy()
+        if i == self.params.langnum-1:
+            src_emb = self.embs[i].weight.data.cpu().numpy()
+        else:
+            src_emb = self.mappings[i](self.embs[i].weight).data.cpu().numpy()
+        if j == self.params.langnum-1:
+            tgt_emb = self.embs[j].weight.data.cpu().numpy()
+        else:
+            tgt_emb = self.mappings[j](self.embs[j].weight).data.cpu().numpy()
         # tgt_emb = self.src_mapping(self.tgt_emb.weight).data.cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
-        self.dicos[i].lang, self.dicos[i].word2id, src_emb,
-        self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
+            self.dicos[i].lang, self.dicos[i].word2id, src_emb,
+            self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
         )
         if src_tgt_ws_scores is None:
             return
@@ -106,8 +112,14 @@ class Evaluator(object):
         Evaluation on word translation.
         """
         # mapped word embeddings
-        src_emb = self.mappings[i](self.embs[i].weight).data
-        tgt_emb = self.mappings[j](self.embs[j].weight).data
+        if i == self.params.langnum-1:
+            src_emb = self.embs[i].weight.data
+        else:
+            src_emb = self.mappings[i](self.embs[i].weight).data
+        if j == self.params.langnum-1:
+            tgt_emb = self.embs[j].weight.data
+        else:
+            tgt_emb = self.mappings[j](self.embs[j].weight).data
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(
@@ -139,9 +151,14 @@ class Evaluator(object):
             return
 
         # mapped word embeddings
-        src_emb = self.mappings[i](self.embs[i].weight).data
-        tgt_emb = self.mappings[j](self.embs[j].weight).data
-
+        if i == self.params.langnum-1:
+            src_emb = self.embs[i].weight.data
+        else:
+            src_emb = self.mappings[i](self.embs[i].weight).data
+        if j == self.params.langnum-1:
+            tgt_emb = self.embs[j].weight.data
+        else:
+            tgt_emb = self.mappings[j](self.embs[j].weight).data
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
 
@@ -172,8 +189,14 @@ class Evaluator(object):
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.mappings[i](self.embs[i].weight).data
-        tgt_emb = self.mappings[j](self.embs[j].weight).data
+        if i == self.params.langnum-1:
+            src_emb = self.embs[i].weight.data
+        else:
+            src_emb = self.mappings[i](self.embs[i].weight).data
+        if j == self.params.langnum-1:
+            tgt_emb = self.embs[j].weight.data
+        else:
+            tgt_emb = self.mappings[j](self.embs[j].weight).data
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
