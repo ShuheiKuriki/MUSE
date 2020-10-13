@@ -1,3 +1,4 @@
+"""evaluate embeddings"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -8,6 +9,7 @@
 from logging import getLogger
 from copy import deepcopy
 import numpy as np
+import torch
 from torch.autograd import Variable
 from torch import Tensor as torch_tensor
 
@@ -22,6 +24,7 @@ logger = getLogger()
 
 
 class Evaluator(object):
+    """Evaluater"""
 
     def __init__(self, trainer):
         """
@@ -32,7 +35,7 @@ class Evaluator(object):
         self.mappings = trainer.mappings
         self.discriminator = trainer.discriminator
         self.params = trainer.params
-        
+
     def monolingual_wordsim(self, to_log):
         """
         Evaluation on monolingual word similarity.
@@ -73,12 +76,12 @@ class Evaluator(object):
             )
         if src_analogy_scores is not None:
             src_analogy_monolingual_scores = np.mean(list(src_analogy_scores.values()))
-            logger.info("Monolingual source word analogy score average: %.5f" % src_analogy_monolingual_scores)
+            logger.info("Monolingual source word analogy score average: %.5f", src_analogy_monolingual_scores)
             to_log['src_analogy_monolingual_scores'] = src_analogy_monolingual_scores
             to_log.update({'src_' + k: v for k, v in src_analogy_scores.items()})
         if self.params.tgt_lang and tgt_analogy_scores is not None:
             tgt_analogy_monolingual_scores = np.mean(list(tgt_analogy_scores.values()))
-            logger.info("Monolingual target word analogy score average: %.5f" % tgt_analogy_monolingual_scores)
+            logger.info("Monolingual target word analogy score average: %.5f", tgt_analogy_monolingual_scores)
             to_log['tgt_analogy_monolingual_scores'] = tgt_analogy_monolingual_scores
             to_log.update({'tgt_' + k: v for k, v in tgt_analogy_scores.items()})
 
@@ -221,8 +224,7 @@ class Evaluator(object):
             else:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
-            logger.info("Mean cosine (%s method, %s build, %i max size): %.5f"
-                        % (dico_method, _params.dico_build, dico_max_size, mean_cosine))
+            logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
             to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
 
     def all_eval(self, to_log):
