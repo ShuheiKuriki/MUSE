@@ -40,7 +40,7 @@ class Evaluator:
         """
         Evaluation on monolingual word similarity.
         """
-        if i == self.params.langnum-1:
+        if i < self.params.langnum-1:
             emb = self.mappings[i](self.embs[i].weight)
         else:
             emb = self.embs[i].weight

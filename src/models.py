@@ -33,13 +33,13 @@ class Discriminator(nn.Module):
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
-        layers.append(nn.Softmax(dim=1))
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
         """calculate forward"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
         output = self.layers(x).view(-1, self.params.langnum)
+        # print(output)
         return output
 
 
@@ -51,7 +51,6 @@ def build_model(params, with_dis):
     dicos, _embs = [0]*params.langnum, [0]*params.langnum
     for i in range(params.langnum):
         dicos[i], _embs[i] = load_embeddings(params, i)
-        print(_embs[i].size())
     params.dicos = dicos
     embs = [nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(params.langnum)]
     for i in range(params.langnum):
