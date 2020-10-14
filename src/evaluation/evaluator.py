@@ -36,30 +36,22 @@ class Evaluator:
         self.discriminator = trainer.discriminator
         self.params = trainer.params
 
-    def monolingual_wordsim(self, to_log):
+    def monolingual_wordsim(self, i, to_log):
         """
         Evaluation on monolingual word similarity.
         """
-        src_ws_scores = get_wordsim_scores(
-            self.src_dico.lang, self.src_dico.word2id, self.src_mapping(self.src_emb.weight).detach().cpu().numpy()
+        if i == self.params.langnum-1:
+            emb = self.mappings[i](self.embs[i].weight)
+        else:
+            emb = self.embs[i].weight
+        ws_scores = get_wordsim_scores(
+            self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy()
         )
-        # tgt_ws_scores = get_wordsim_scores(
-            # self.tgt_dico.lang, self.tgt_dico.word2id, self.tgt_mapping(self.tgt_emb.weight).detach().cpu().numpy()
-        # ) if self.params.tgt_lang else None
-        if src_ws_scores is not None:
-            src_ws_monolingual_scores = np.mean(list(src_ws_scores.values()))
-            logger.info("Monolingual source word similarity score average: %.5f", src_ws_monolingual_scores)
-            to_log['src_ws_monolingual_scores'] = src_ws_monolingual_scores
-            to_log.update({'src_' + k: v for k, v in src_ws_scores.items()})
-        if src_ws_scores is not None:
-            tgt_ws_monolingual_scores = np.mean(list(src_ws_scores.values()))
-            logger.info("Monolingual target word similarity score average: %.5f", tgt_ws_monolingual_scores)
-            to_log['tgt_ws_monolingual_scores'] = tgt_ws_monolingual_scores
-            to_log.update({'tgt_' + k: v for k, v in src_ws_scores.items()})
-        if src_ws_scores is not None and src_ws_scores is not None:
-            ws_monolingual_scores = (src_ws_monolingual_scores + tgt_ws_monolingual_scores) / 2
+        if ws_scores is not None:
+            ws_monolingual_scores = np.mean(list(ws_scores.values()))
             logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
             to_log['ws_monolingual_scores'] = ws_monolingual_scores
+            to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
 
     def monolingual_wordanalogy(self, to_log):
         """
@@ -232,11 +224,12 @@ class Evaluator:
         Run all evaluations.
         """
         for i in range(self.params.langnum):
+            logger.info('evaluate %s', self.params.langs[i])
+            self.monolingual_wordsim(i, to_log)
             for j in range(self.params.langnum):
                 if i == j:
                     continue
-                print('evaluate', self.params.langs[i], self.params.langs[j])
-                # self.monolingual_wordsim(to_log)
+                logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
                 self.crosslingual_wordsim(i, j, to_log)
                 self.word_translation(i, j, to_log)
                 self.sent_translation(i, j, to_log)

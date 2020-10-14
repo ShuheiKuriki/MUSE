@@ -1,3 +1,4 @@
+"""train"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -23,7 +24,8 @@ from .evaluation.word_translation import DIC_EVAL_PATH, load_identical_char_dico
 logger = getLogger()
 
 
-class Trainer(object):
+class Trainer():
+    """train class"""
 
     def __init__(self, embs, mappings, discriminator, params):
         """
@@ -113,7 +115,7 @@ class Trainer(object):
         # check NaN
         if (loss != loss).detach().any():
             logger.error("NaN detected (discriminator)")
-            exit()
+            sys.exit()
 
         # optim
         self.dis_optimizer.zero_grad()
@@ -121,7 +123,7 @@ class Trainer(object):
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
-    def mapping_step(self, stats):
+    def mapping_step(self):
         """
         Fooling discriminator training step.
         """
@@ -133,13 +135,12 @@ class Trainer(object):
         # loss
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
-        loss = -F.cross_entropy(preds, y)
-        loss = self.params.dis_lambda * loss
+        loss = self.params.dis_lambda * -F.cross_entropy(preds, y)
 
         # check NaN
         if (loss != loss).detach().any():
             logger.error("NaN detected (fool discriminator)")
-            exit()
+            sys.exit()
 
         # optim
         self.map_optimizer.zero_grad()
@@ -147,7 +148,7 @@ class Trainer(object):
         self.map_optimizer.step()
         self.orthogonalize()
 
-        return 2 * self.params.batch_size
+        return self.params.langnum * self.params.batch_size
 
     def load_training_dico(self, dico_train):
         """
@@ -209,14 +210,11 @@ class Trainer(object):
         """
         Orthogonalize the mapping.
         """
-        langnum = self.params.langnum
         if self.params.map_beta > 0:
-            Ws = [0]*(langnum-1)
-            for i in range(langnum-1):
-                Ws[i] = self.mappings[i].weight.detach()
             beta = self.params.map_beta
-            for i in range(langnum-1):
-                Ws[i].copy_((1 + beta) * Ws[i] - beta * Ws[i].mm(Ws[i].transpose(0, 1).mm(Ws[i])))
+            for i in range(self.params.langnum-1):
+                W = self.mappings[i].weight.detach()
+                W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
 
     def update_lr(self, to_log, metric):
         """

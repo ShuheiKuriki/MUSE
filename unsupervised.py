@@ -117,12 +117,13 @@ if params.adversarial:
 
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
+
             # discriminator training
             for _ in range(params.dis_steps):
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.mapping_step(stats)
+            n_words_proc += trainer.mapping_step()
 
             # log stats
             if n_iter % 500 == 0:

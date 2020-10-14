@@ -39,7 +39,7 @@ class Discriminator(nn.Module):
     def forward(self, x):
         """calculate forward"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        output = self.layers(x)
+        output = self.layers(x).view(-1, self.params.langnum)
         return output
 
 
