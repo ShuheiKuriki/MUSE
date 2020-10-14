@@ -24,7 +24,7 @@ from .evaluation.word_translation import DIC_EVAL_PATH, load_identical_char_dico
 logger = getLogger()
 
 
-class Trainer(object):
+class Trainer():
     """muse trainer"""
     def __init__(self, src_emb, tgt_emb, mapping, discriminator, params):
         """
@@ -68,11 +68,16 @@ class Trainer(object):
             tgt_ids = tgt_ids.cuda()
 
         # get word embeddings
-        src_emb = self.src_emb(Variable(src_ids, volatile=True))
-        tgt_emb = self.tgt_emb(Variable(tgt_ids, volatile=True))
-        src_emb = self.mapping(Variable(src_emb.data, volatile=volatile))
-        tgt_emb = Variable(tgt_emb.data, volatile=volatile)
-
+        if volatile:
+            with torch.no_grad():
+                src_emb = self.src_emb(src_ids)
+                tgt_emb = self.tgt_emb(tgt_ids)
+                src_emb = self.mapping(src_emb.detach())
+        else:
+            src_emb = self.src_emb(src_ids)
+            tgt_emb = self.tgt_emb(tgt_ids)
+            src_emb = self.mapping(src_emb.detach())
+    
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
         y = torch.FloatTensor(2 * bs).zero_()
@@ -90,13 +95,13 @@ class Trainer(object):
 
         # loss
         x, y = self.get_dis_xy(volatile=True)
-        preds = self.discriminator(Variable(x.data))
+        preds = self.discriminator(Variable(x.detach()))
         loss = F.binary_cross_entropy(preds, y)
         # loss = F.cross_entropy(preds, y)
-        stats['DIS_COSTS'].append(loss.data.item())
+        stats['DIS_COSTS'].append(loss.detach().item())
 
         # check NaN
-        if (loss != loss).data.any():
+        if (loss != loss).detach().any():
             logger.error("NaN detected (discriminator)")
             sys.exit()
 
@@ -123,7 +128,7 @@ class Trainer(object):
         loss = self.params.dis_lambda * loss
 
         # check NaN
-        if (loss != loss).data.any():
+        if (loss != loss).detach().any():
             logger.error("NaN detected (fool discriminator)")
             sys.exit()
 
@@ -164,8 +169,8 @@ class Trainer(object):
         """
         Build a dictionary from aligned embeddings.
         """
-        src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.tgt_emb.weight.data
+        src_emb = self.mapping(self.src_emb.weight).detach()
+        tgt_emb = self.tgt_emb.weight.detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
         self.dico = build_dictionary(src_emb, tgt_emb, self.params)
@@ -175,9 +180,9 @@ class Trainer(object):
         Find the best orthogonal matrix mapping using the Orthogonal Procrustes problem
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
-        A = self.src_emb.weight.data[self.dico[:, 0]]
-        B = self.tgt_emb.weight.data[self.dico[:, 1]]
-        W = self.mapping.weight.data
+        A = self.src_emb.weight.detach()[self.dico[:, 0]]
+        B = self.tgt_emb.weight.detach()[self.dico[:, 1]]
+        W = self.mapping.weight.detach()
         M = B.transpose(0, 1).mm(A).cpu().numpy()
         U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
         W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -187,7 +192,7 @@ class Trainer(object):
         Orthogonalize the mapping.
         """
         if self.params.map_beta > 0:
-            W = self.mapping.weight.data
+            W = self.mapping.weight.detach()
             beta = self.params.map_beta
             W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
 
@@ -226,7 +231,7 @@ class Trainer(object):
             self.best_valid_metric = to_log[metric]
             logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the mapping
-            W = self.mapping.weight.data.cpu().numpy()
+            W = self.mapping.weight.detach().cpu().numpy()
             path = os.path.join(self.params.exp_path, 'best_mapping.pth')
             logger.info('* Saving the mapping to %s ...', path)
             torch.save(W, path)
@@ -240,7 +245,7 @@ class Trainer(object):
         # reload the model
         assert os.path.isfile(path)
         to_reload = torch.from_numpy(torch.load(path))
-        W = self.mapping.weight.data
+        W = self.mapping.weight.detach()
         assert to_reload.size() == W.size()
         W.copy_(to_reload.type_as(W))
 
@@ -264,7 +269,7 @@ class Trainer(object):
         logger.info("Map source embeddings to the target space ...")
         for i, k in enumerate(range(0, len(src_emb), bs)):
             x = Variable(src_emb[k:k + bs], volatile=True)
-            src_emb[k:k + bs] = self.mapping(x.cuda() if params.cuda else x).data.cpu()
+            src_emb[k:k + bs] = self.mapping(x.cuda() if params.cuda else x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(src_emb, tgt_emb, params)

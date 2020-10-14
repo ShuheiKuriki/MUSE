@@ -78,7 +78,7 @@ parser.add_argument("--normalize_embeddings", type=str, default="", help="Normal
 
 # parse parameters
 params = parser.parse_args()
-params.exp_id = '{}-{}-unsup'.format(params.src_lang, params.tgt_lang)
+# params.exp_id = '{}-{}-unsup'.format(params.src_lang, params.tgt_lang)
 params.src_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.src_lang)
 params.tgt_emb = '{}/wiki.{}.vec'.format(params.emb_folder, params.tgt_lang)
 if params.dammy:

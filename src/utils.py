@@ -218,7 +218,7 @@ def get_optimizer(s):
     # check that we give good parameters to the optimizer
     expected_args = inspect.getargspec(optim_fn.__init__)[0]
     assert expected_args[:2] == ['self', 'params']
-    if not all(k in expected_args[2:] for k in optim_params.keys()):
+    if not all(k in expected_args[2:] for k in optim_params):
         raise Exception('Unexpected parameters: expected "%s", got "%s"',
             str(expected_args[2:]), str(optim_params.keys()))
 
@@ -238,14 +238,14 @@ def get_exp_path(params):
     if not os.path.exists(exp_folder):
         subprocess.Popen("mkdir %s" % exp_folder, shell=True).wait()
     if params.exp_id == '':
-        # chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-        # while True:
-        #     exp_id = ''.join(random.choice(chars) for _ in range(10))
-        #     exp_path = os.path.join(exp_folder, exp_id)
-        #     if not os.path.isdir(exp_path):
-        #         break
-        # exp_id = datetime.now().strftime('%Y%m%d-%H%M%S')
-        exp_path = exp_folder
+        chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+        while True:
+            exp_id = ''.join(random.choice(chars) for _ in range(10))
+            exp_path = os.path.join(exp_folder, exp_id)
+            if not os.path.isdir(exp_path):
+                break
+        exp_id = datetime.now().strftime('%Y%m%d-%H%M%S')
+        # exp_path = exp_folder
     else:
         exp_path = os.path.join(exp_folder, params.exp_id)
         assert not os.path.isdir(exp_path), exp_path
