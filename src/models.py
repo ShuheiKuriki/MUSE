@@ -37,10 +37,9 @@ class Discriminator(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
+        """calculate forward"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
         output = self.layers(x)
-        # print(torch.mean(output[:32, 0]))
-        # print(torch.mean(output[32:, 1]))
         return output
 
 
@@ -48,6 +47,7 @@ def build_model(params, with_dis):
     """
     Build all components of the model.
     """
+    # embeddings
     dicos, _embs = [0]*params.langnum, [0]*params.langnum
     for i in range(params.langnum):
         dicos[i], _embs[i] = load_embeddings(params, i)
@@ -57,30 +57,11 @@ def build_model(params, with_dis):
     for i in range(params.langnum):
         embs[i].weight.data.copy_(_embs[i])
 
-    # target embeddings
-    # if params.tgt_lang:
-    #     tgt_dico, _tgt_emb = load_embeddings(params, source=False)
-    #     params.tgt_dico = tgt_dico
-    #     tgt_emb = nn.Embedding(len(tgt_dico), params.emb_dim, sparse=True)
-    #     tgt_emb.weight.data.copy_(_tgt_emb)
-    # else:
-    #     tgt_emb = None
-    # if params.third_lang:
-    #     third_dico, _third_emb = load_embeddings(params, source=False)
-    #     params.third_dico = third_dico
-    #     third_emb = nn.Embedding(len(third_dico), params.emb_dim, sparse=True)
-    #     third_emb.weight.data.copy_(_third_emb)
-    # else:
-    #     third_emb = None
-
     # mapping
     mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum-1)]
     if getattr(params, 'map_id_init', True):
         for i in range(params.langnum-1):
             mappings[i].weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
-    # tgt_mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
-    # if getattr(params, 'map_id_init', True):
-    #     tgt_mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
 
     # discriminator
     discriminator = Discriminator(params) if with_dis else None
@@ -91,21 +72,10 @@ def build_model(params, with_dis):
             embs[i].cuda()
         for i in range(params.langnum-1):
             mappings[i].cuda()
-        # if params.tgt_lang:
-        #     tgt_emb.cuda()
-        #     tgt_mapping.cuda()
-        # if params.third_lang:
-        #     third_emb.cuda()
         if with_dis:
             discriminator.cuda()
 
     # normalize embeddings
     params.means = [normalize_embeddings(embs[i].weight.data, params.normalize_embeddings) for i in range(params.langnum)]
-    # for i in range(params.langnum):
-        # params.src_mean = normalize_embeddings(embs[i].weight.data, params.normalize_embeddings)
-    # if params.tgt_lang:
-        # params.tgt_mean = normalize_embeddings(tgt_emb.weight.data, params.normalize_embeddings)
-    # if params.third_lang:
-        # params.third_mean = normalize_embeddings(third_emb.weight.data, params.normalize_embeddings)
 
     return embs, mappings, discriminator

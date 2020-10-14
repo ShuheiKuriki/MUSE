@@ -6,6 +6,7 @@
 #
 
 import os
+import sys
 from logging import getLogger
 import scipy
 import scipy.linalg
@@ -41,7 +42,12 @@ class Trainer(object):
             lis = []
             for i in range(params.langnum-1):
                 lis += mappings[i].parameters()
+                # print(mappings[i].parameters())
+            # print(lis)
             self.map_optimizer = optim_fn(lis, **optim_params)
+            # for p in mappings[0].parameters():
+                # print(p.device)
+            # self.map_optimizer = optim_fn(mappings[0].parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -213,13 +219,13 @@ class Trainer(object):
         old_lr = self.map_optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
         if new_lr < old_lr:
-            logger.info("Decreasing learning rate: %.8f -> %.8f" % (old_lr, new_lr))
+            logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
             self.map_optimizer.param_groups[0]['lr'] = new_lr
 
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
             if to_log[metric] < self.best_valid_metric:
                 logger.info("Validation metric is smaller than the best: %.5f vs %.5f"
-                            % (to_log[metric], self.best_valid_metric))
+                            , to_log[metric], self.best_valid_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
                 if self.decrease_lr:

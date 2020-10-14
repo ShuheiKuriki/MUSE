@@ -23,7 +23,7 @@ from src.utils import get_idf
 logger = getLogger()
 
 
-class Evaluator(object):
+class Evaluator:
     """Evaluater"""
 
     def __init__(self, trainer):
