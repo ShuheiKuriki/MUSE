@@ -59,7 +59,7 @@ class Trainer(object):
 
         self.decrease_lr = False
 
-    def get_dis_xy(self):
+    def get_dis_xy(self, volatile):
         """
         Get discriminator input batch / output target.
         """
@@ -76,11 +76,19 @@ class Trainer(object):
 
         # get word embeddings
         embs = [0]*langnum
-        with torch.no_grad():
-            for i in range(langnum):
-                embs[i] = self.embs[i](Variable(ids[i]).cuda() if self.params.cuda else Variable(ids[i]))
+        if volatile:
+            with torch.no_grad():
+                for i in range(langnum):
+                    embs[i] = self.embs[i](ids[i])
+                for i in range(langnum-1):
+                    embs[i] = self.mappings[i](embs[i].detach())
+        else:
+            with torch.no_grad():
+                for i in range(langnum):
+                    embs[i] = self.embs[i](ids[i])
             for i in range(langnum-1):
-                embs[i] = self.mappings[i](Variable(embs[i].data).cuda() if self.params.cuda else Variable(embs[i].data))
+                embs[i] = self.mappings[i](embs[i].detach())
+
         # input / target
         x = torch.cat(embs, 0)
         y = torch.zeros(langnum * bs, dtype=torch.int64)
@@ -97,13 +105,13 @@ class Trainer(object):
         self.discriminator.train()
 
         # loss
-        x, y = self.get_dis_xy()
-        preds = self.discriminator(Variable(x.data))
+        x, y = self.get_dis_xy(volatile=True)
+        preds = self.discriminator(Variable(x.detach()))
         loss = F.cross_entropy(preds, y)
-        stats['DIS_COSTS'].append(loss.data.item())
+        stats['DIS_COSTS'].append(loss.detach().item())
 
         # check NaN
-        if (loss != loss).data.any():
+        if (loss != loss).detach().any():
             logger.error("NaN detected (discriminator)")
             exit()
 
@@ -123,13 +131,13 @@ class Trainer(object):
         self.discriminator.eval()
 
         # loss
-        x, y = self.get_dis_xy()
+        x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
         loss = -F.cross_entropy(preds, y)
         loss = self.params.dis_lambda * loss
 
         # check NaN
-        if (loss != loss).data.any():
+        if (loss != loss).detach().any():
             logger.error("NaN detected (fool discriminator)")
             exit()
 
@@ -170,9 +178,9 @@ class Trainer(object):
         """
         Build a dictionary from aligned embeddings.
         """
-        src_emb = self.mapping(self.src_emb.weight).data
-        tgt_emb = self.mapping(self.tgt_emb.weight).data
-        third_emb = self.mapping(self.third_emb.weight).data
+        src_emb = self.mapping(self.src_emb.weight).detach()
+        tgt_emb = self.mapping(self.tgt_emb.weight).detach()
+        third_emb = self.mapping(self.third_emb.weight).detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
         third_emb = third_emb / third_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
@@ -184,12 +192,12 @@ class Trainer(object):
         Find the best orthogonal matrix mapping using the Orthogonal Procrustes problem
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
-        A = self.src_emb.weight.data[self._src_dico[:, 0]]
-        B = self.tgt_emb.weight.data[self._tgt_dico[:, 0]]
-        C1 = self.third_emb.weight.data[self._src_dico[:, 1]]
-        C2 = self.third_emb.weight.data[self._tgt_dico[:, 1]]
-        W1 = self.src_mapping.weight.data
-        W2 = self.tgt_mapping.weight.data
+        A = self.src_emb.weight.detach()[self._src_dico[:, 0]]
+        B = self.tgt_emb.weight.detach()[self._tgt_dico[:, 0]]
+        C1 = self.third_emb.weight.detach()[self._src_dico[:, 1]]
+        C2 = self.third_emb.weight.detach()[self._tgt_dico[:, 1]]
+        W1 = self.src_mapping.weight.detach()
+        W2 = self.tgt_mapping.weight.detach()
         M1 = C1.transpose(0, 1).mm(A).cpu().numpy()
         M2 = C2.transpose(0, 1).mm(B).cpu().numpy()
         U1, S1, V_t1 = scipy.linalg.svd(M1, full_matrices=True)
@@ -205,7 +213,7 @@ class Trainer(object):
         if self.params.map_beta > 0:
             Ws = [0]*(langnum-1)
             for i in range(langnum-1):
-                Ws[i] = self.mappings[i].weight.data
+                Ws[i] = self.mappings[i].weight.detach()
             beta = self.params.map_beta
             for i in range(langnum-1):
                 Ws[i].copy_((1 + beta) * Ws[i] - beta * Ws[i].mm(Ws[i].transpose(0, 1).mm(Ws[i])))
@@ -243,11 +251,11 @@ class Trainer(object):
         if to_log[metric] > self.best_valid_metric:
             # new best mapping
             self.best_valid_metric = to_log[metric]
-            logger.info('* Best value for "%s": %.5f' % (metric, to_log[metric]))
+            logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the mapping
-            W = self.mapping.weight.data.cpu().numpy()
+            W = self.mapping.weight.detach().cpu().numpy()
             path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-            logger.info('* Saving the mapping to %s ...' % path)
+            logger.info('* Saving the mapping to %s ...', path)
             torch.save(W, path)
 
     def reload_best(self):
@@ -255,11 +263,11 @@ class Trainer(object):
         Reload the best mapping.
         """
         path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-        logger.info('* Reloading the best model from %s ...' % path)
+        logger.info('* Reloading the best model from %s ...', path)
         # reload the model
         assert os.path.isfile(path)
         to_reload = torch.from_numpy(torch.load(path))
-        W = self.mapping.weight.data
+        W = self.mapping.weight.detach()
         assert to_reload.size() == W.size()
         W.copy_(to_reload.type_as(W))
 
@@ -286,7 +294,7 @@ class Trainer(object):
         for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = Variable(embs[j][k:k + bs], volatile=True)
-                embs[j][k:k + bs] = self.mappings[j](x.cuda() if params.cuda else x).data.cpu()
+                embs[j][k:k + bs] = self.mappings[j](x.cuda() if params.cuda else x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)
