@@ -12,7 +12,7 @@ from logging import getLogger
 import scipy
 import scipy.linalg
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 from torch.nn import functional as F
 
 from .utils import get_optimizer, load_embeddings, normalize_embeddings, export_embeddings
@@ -77,13 +77,13 @@ class Trainer():
             src_emb = self.src_emb(src_ids)
             tgt_emb = self.tgt_emb(tgt_ids)
             src_emb = self.mapping(src_emb.detach())
-    
+
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
         y = torch.FloatTensor(2 * bs).zero_()
         y[:bs] = 1 - self.params.dis_smooth
         y[bs:] = self.params.dis_smooth
-        y = Variable(y.cuda() if self.params.cuda else y)
+        y = y.cuda() if self.params.cuda else y
 
         return x, y
 
@@ -95,7 +95,7 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy(volatile=True)
-        preds = self.discriminator(Variable(x.detach()))
+        preds = self.discriminator(x.detach())
         loss = F.binary_cross_entropy(preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
@@ -268,8 +268,11 @@ class Trainer():
         bs = 4096
         logger.info("Map source embeddings to the target space ...")
         for i, k in enumerate(range(0, len(src_emb), bs)):
-            x = Variable(src_emb[k:k + bs], volatile=True)
-            src_emb[k:k + bs] = self.mapping(x.cuda() if params.cuda else x).detach().cpu()
+            with torch.no_grad():
+                x = src_emb[k:k + bs]
+                if params.cuda():
+                    x = x.cuda()
+            src_emb[k:k + bs] = self.mapping(x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(src_emb, tgt_emb, params)

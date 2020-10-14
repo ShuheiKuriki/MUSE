@@ -1,3 +1,4 @@
+"""evaluate embeddings"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -8,7 +9,7 @@
 from logging import getLogger
 from copy import deepcopy
 import numpy as np
-from torch.autograd import Variable
+# from torch.autograd import Variable
 from torch import Tensor as torch_tensor
 from torch import no_grad
 
@@ -22,7 +23,8 @@ from src.utils import get_idf
 logger = getLogger()
 
 
-class Evaluator(object):
+class Evaluator():
+    """class for evaluate embeddings"""
 
     def __init__(self, trainer):
         """
