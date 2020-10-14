@@ -11,7 +11,7 @@ from logging import getLogger
 import scipy
 import scipy.linalg
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 from torch.nn import functional as F
 
 from .utils import get_optimizer, load_embeddings, normalize_embeddings, export_embeddings
@@ -94,7 +94,7 @@ class Trainer(object):
         y = torch.zeros(langnum * bs, dtype=torch.int64)
         for i in range(langnum):
             y[i*bs:(i+1)*bs] = i
-        y = Variable(y.cuda() if self.params.cuda else y)
+        y = y.cuda() if self.params.cuda else y
 
         return x, y
 
@@ -106,7 +106,7 @@ class Trainer(object):
 
         # loss
         x, y = self.get_dis_xy(volatile=True)
-        preds = self.discriminator(Variable(x.detach()))
+        preds = self.discriminator(x.detach())
         loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
 
@@ -293,8 +293,9 @@ class Trainer(object):
         logger.info("Map source embeddings to the target space ...")
         for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
-                x = Variable(embs[j][k:k + bs], volatile=True)
-                embs[j][k:k + bs] = self.mappings[j](x.cuda() if params.cuda else x).detach().cpu()
+                with torch.no_grad():
+                    x = embs[j][k:k + bs].cuda() if params.cuda else embs[j][k:k + bs]
+                embs[j][k:k + bs] = self.mappings[j](x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)

@@ -10,7 +10,7 @@ from logging import getLogger
 from copy import deepcopy
 import numpy as np
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 from torch import Tensor as torch_tensor
 
 from . import get_wordsim_scores, get_crosslingual_wordsim_scores, get_wordanalogy_scores
