@@ -12,6 +12,7 @@ import numpy as np
 import torch
 # from torch.autograd import Variable
 from torch import Tensor as torch_tensor
+import torch.nn.functional as F
 
 from . import get_wordsim_scores, get_crosslingual_wordsim_scores, get_wordanalogy_scores
 from . import get_word_translation_accuracy
@@ -253,6 +254,7 @@ class Evaluator:
                         preds = self.discriminator(self.mappings[i](emb))
                     else:
                         preds = self.discriminator(emb)
+                preds = F.softmax(preds)
                 preds_[i].extend(preds.detach().cpu().tolist())
             pred_[i] = np.mean([x[i] for x in preds_[i]])
             # print(preds_[i][0])
