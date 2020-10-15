@@ -270,7 +270,7 @@ class Trainer():
         for i, k in enumerate(range(0, len(src_emb), bs)):
             with torch.no_grad():
                 x = src_emb[k:k + bs]
-                if params.cuda():
+                if params.cuda:
                     x = x.cuda()
             src_emb[k:k + bs] = self.mapping(x).detach().cpu()
 
