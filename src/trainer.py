@@ -94,9 +94,10 @@ class Trainer():
 
         # input / target
         x = torch.cat(embs, 0)
+        # y = torch.zeros(langnum * bs, dtype=torch.int64)
         y = torch.zeros(langnum * bs, dtype=torch.float32)
         for i in range(langnum):
-            y[i*bs:(i+1)*bs] = i
+            y[i*bs:(i+1)*bs] = 1-i
         y = y.cuda() if self.params.cuda else y
 
         return x, y
@@ -111,7 +112,7 @@ class Trainer():
         x, y = self.get_dis_xy(volatile=True)
         preds = self.discriminator(x.detach())
         # loss = F.cross_entropy(preds, y)
-        loss = F.binary_cross_entropy(torch.sigmoid(preds[:, 1]-preds[:, 0]), y)
+        loss = F.binary_cross_entropy(torch.sigmoid(preds), y)
         # print(loss)
         stats['DIS_COSTS'].append(loss.detach().item())
 
@@ -138,8 +139,8 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
-        # loss = self.params.dis_lambda * -F.cross_entropy(preds, y)
-        loss = self.params.dis_lambda * F.binary_cross_entropy(torch.sigmoid(preds[:, 1]-preds[:, 0]), 1-y)
+        # loss = self.params.dis_lambda * F.cross_entropy(preds, 1-y)
+        loss = self.params.dis_lambda * F.binary_cross_entropy(torch.sigmoid(preds), 1-y)
         # print(loss)
 
         # check NaN

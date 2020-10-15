@@ -256,10 +256,10 @@ class Evaluator:
                         preds = self.discriminator(emb)
                 preds = F.softmax(preds)
                 preds_[i].extend(preds.detach().cpu().tolist())
-            pred_[i] = np.mean([x[i] for x in preds_[i]])
-            # print(preds_[i][0])
+                pred_[i] = np.mean([x[i] for x in preds_[i]])
+                # print(preds_[i][0])
 
-            logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
+                logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
 
         accus = [0]*langnum
         cnt = 0
