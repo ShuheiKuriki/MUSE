@@ -69,7 +69,7 @@ class Trainer():
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
         langnum = self.params.langnum
-        # assert mf <= min(len(self.src_dico), len(self.tgt_dico))
+        assert mf <= min(map(len, self.dicos))
         ids = [0]*langnum
         for i in range(langnum):
             ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
@@ -84,16 +84,17 @@ class Trainer():
                     embs[i] = self.embs[i](ids[i])
                 for i in range(langnum-1):
                     embs[i] = self.mappings[i](embs[i].detach())
+                embs[-1] = embs[-1].detach()
         else:
-            with torch.no_grad():
-                for i in range(langnum):
-                    embs[i] = self.embs[i](ids[i])
+            for i in range(langnum):
+                embs[i] = self.embs[i](ids[i])
             for i in range(langnum-1):
                 embs[i] = self.mappings[i](embs[i].detach())
+            embs[-1] = embs[-1].detach()
 
         # input / target
         x = torch.cat(embs, 0)
-        y = torch.zeros(langnum * bs, dtype=torch.int64)
+        y = torch.zeros(langnum * bs, dtype=torch.float32)
         for i in range(langnum):
             y[i*bs:(i+1)*bs] = i
         y = y.cuda() if self.params.cuda else y
@@ -109,7 +110,9 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy(volatile=True)
         preds = self.discriminator(x.detach())
-        loss = F.cross_entropy(preds, y)
+        # loss = F.cross_entropy(preds, y)
+        loss = F.binary_cross_entropy(torch.sigmoid(preds[:, 1]-preds[:, 0]), y)
+        # print(loss)
         stats['DIS_COSTS'].append(loss.detach().item())
 
         # check NaN
@@ -135,7 +138,9 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy(volatile=False)
         preds = self.discriminator(x)
-        loss = self.params.dis_lambda * -F.cross_entropy(preds, y)
+        # loss = self.params.dis_lambda * -F.cross_entropy(preds, y)
+        loss = self.params.dis_lambda * F.binary_cross_entropy(torch.sigmoid(preds[:, 1]-preds[:, 0]), 1-y)
+        # print(loss)
 
         # check NaN
         if (loss != loss).detach().any():
