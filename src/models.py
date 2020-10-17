@@ -34,6 +34,7 @@ class Discriminator(nn.Module):
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
+        layers.append(nn.Sigmoid())
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
