@@ -41,12 +41,12 @@ class Trainer():
         # optimizers
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            lis = []
-            for i in range(params.langnum-1):
-                lis += mappings[i].parameters()
+            # lis = []
+            # for i in range(params.langnum-1):
+                # lis += mappings[i].parameters()
                 # print(mappings[i].parameters())
             # print(lis)
-            self.map_optimizer = optim_fn(lis, **optim_params)
+            self.map_optimizer = optim_fn(mappings.parameters(), **optim_params)
             # for p in mappings[0].parameters():
                 # print(p.device)
             # self.map_optimizer = optim_fn(mappings[0].parameters(), **optim_params)
@@ -108,6 +108,7 @@ class Trainer():
         Train the discriminator.
         """
         self.discriminator.train()
+        self.mapping.eval()
 
         # loss
         x, y = self.get_dis_xy(volatile=True)
@@ -136,6 +137,7 @@ class Trainer():
             return 0
 
         self.discriminator.eval()
+        self.mapping.train()
 
         # loss
         x, y = self.get_dis_xy(volatile=False)
@@ -247,60 +249,3 @@ class Trainer():
                     logger.info("Shrinking the learning rate: %.5f -> %.5f"
                                 , old_lr, self.map_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
-
-    def save_best(self, to_log, metric):
-        """
-        Save the best model for the given validation metric.
-        """
-        # best mapping for the given validation criterion
-        if to_log[metric] > self.best_valid_metric:
-            # new best mapping
-            self.best_valid_metric = to_log[metric]
-            logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
-            # save the mapping
-            W = self.mapping.weight.detach().cpu().numpy()
-            path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-            logger.info('* Saving the mapping to %s ...', path)
-            torch.save(W, path)
-
-    def reload_best(self):
-        """
-        Reload the best mapping.
-        """
-        path = os.path.join(self.params.exp_path, 'best_mapping.pth')
-        logger.info('* Reloading the best model from %s ...', path)
-        # reload the model
-        assert os.path.isfile(path)
-        to_reload = torch.from_numpy(torch.load(path))
-        W = self.mapping.weight.detach()
-        assert to_reload.size() == W.size()
-        W.copy_(to_reload.type_as(W))
-
-    def export(self):
-        """
-        Export embeddings.
-        """
-        params = self.params
-
-        # load all embeddings
-        logger.info("Reloading all embeddings for mapping ...")
-        embs = [0]*params.langnum
-        for i in range(params.langnum):
-            params.dicos[i], embs[i] = load_embeddings(params, i, full_vocab=True)
-
-        # apply same normalization as during training
-        for i in range(params.langnum):
-            normalize_embeddings(embs[i], params.normalize_embeddings, mean=params.means[i])
-        # normalize_embeddings(tgt_emb, params.normalize_embeddings, mean=params.tgt_mean)
-
-        # map source embeddings to the target space
-        bs = 4096
-        logger.info("Map source embeddings to the target space ...")
-        for j in range(params.langnum-1):
-            for i, k in enumerate(range(0, len(embs[j]), bs)):
-                with torch.no_grad():
-                    x = embs[j][k:k + bs].cuda() if params.cuda else embs[j][k:k + bs]
-                embs[j][k:k + bs] = self.mappings[j](x).detach().cpu()
-
-        # write embeddings to the disk
-        export_embeddings(embs, params)
