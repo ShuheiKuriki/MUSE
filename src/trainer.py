@@ -53,7 +53,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self, volatile):
+    def get_dis_xy(self):
         """
         Get discriminator input batch / output target.
         """
@@ -70,17 +70,10 @@ class Trainer():
 
         # get word embeddings
         embs = [0]*langnum
-        with torch.no_grad():
-            embs[-1] = self.embs[-1](ids[-1])
-        if volatile:
-            with torch.no_grad():
-                for i in range(langnum-1):
-                    embs[i] = self.embs[i](ids[i])
-                    embs[i] = self.generator(embs[i].detach(), i)
-        else:
-            for i in range(langnum-1):
-                embs[i] = self.embs[i](ids[i])
-                embs[i] = self.generator(embs[i].detach(), i)
+        for i in range(langnum):
+            embs[i] = self.embs[i](ids[i])
+        for i in range(langnum-1):
+            embs[i] = self.generator(embs[i].detach(), i)
 
         # input / target
         x = torch.cat(embs, 0)
@@ -100,7 +93,7 @@ class Trainer():
         self.generator.eval()
 
         # loss
-        x, y = self.get_dis_xy(volatile=True)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
         # loss = F.cross_entropy(preds, y)
         loss = F.binary_cross_entropy(preds, y)
@@ -129,7 +122,7 @@ class Trainer():
         self.generator.train()
 
         # loss
-        x, y = self.get_dis_xy(volatile=False)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x)
         # loss = self.params.dis_lambda * F.cross_entropy(preds, 1-y)
         loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
