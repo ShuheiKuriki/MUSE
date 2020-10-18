@@ -70,26 +70,24 @@ class Trainer():
 
         # get word embeddings
         embs = [0]*langnum
+        with torch.no_grad():
+            embs[-1] = self.embs[-1](ids[-1])
         if volatile:
             with torch.no_grad():
-                for i in range(langnum):
-                    embs[i] = self.embs[i](ids[i])
                 for i in range(langnum-1):
+                    embs[i] = self.embs[i](ids[i])
                     embs[i] = self.generator(embs[i].detach(), i)
-                # embs[-1] = embs[-1].detach()
         else:
-            for i in range(langnum):
-                embs[i] = self.embs[i](ids[i])
             for i in range(langnum-1):
+                embs[i] = self.embs[i](ids[i])
                 embs[i] = self.generator(embs[i].detach(), i)
-            # embs[-1] = embs[-1].detach()
 
         # input / target
         x = torch.cat(embs, 0)
         # y = torch.zeros(langnum * bs, dtype=torch.int64)
         y = torch.FloatTensor(langnum * bs).zero_()
         for i in range(langnum):
-            y[i*bs:(i+1)*bs] = 1-i
+            y[i*bs:(i+1)*bs] = 1-i+self.params.dis_smooth*(2*i-1)
         y = y.cuda() if self.params.cuda else y
 
         return x, y
