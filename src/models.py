@@ -58,7 +58,7 @@ class Generator(nn.Module):
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
-                self.mappings[i].weight.data.copy_(torch.diag(torch.ones(self.emb_dim)))
+                self.mappings[i].weight.detach().copy_(torch.diag(torch.ones(self.emb_dim)))
 
     def forward(self, x, i):
         """map into target space"""
@@ -86,7 +86,7 @@ def build_model(params, with_dis):
     params.dicos = dicos
     embs = [nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(params.langnum)]
     for i in range(params.langnum):
-        embs[i].weight.data.copy_(_embs[i])
+        embs[i].weight.detach().copy_(_embs[i])
 
     # mapping
     # mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum-1)]
@@ -107,6 +107,6 @@ def build_model(params, with_dis):
             discriminator.cuda()
 
     # normalize embeddings
-    params.means = [normalize_embeddings(embs[i].weight.data, params.normalize_embeddings) for i in range(params.langnum)]
+    params.means = [normalize_embeddings(embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
 
     return embs, generator, discriminator

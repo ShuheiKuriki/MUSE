@@ -73,7 +73,7 @@ class Trainer():
         for i in range(langnum):
             embs[i] = self.embs[i](ids[i])
         for i in range(langnum-1):
-            embs[i] = self.generator(embs[i].detach(), i)
+            embs[i] = self.generator(embs[i], i)
 
         # input / target
         x = torch.cat(embs, 0)
@@ -94,7 +94,7 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x.detach())
+        preds = self.discriminator(x)
         # loss = F.cross_entropy(preds, y)
         loss = F.binary_cross_entropy(preds, y)
         # print(loss)

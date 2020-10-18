@@ -257,7 +257,7 @@ def clip_parameters(model, clip):
     """
     if clip > 0:
         for x in model.parameters():
-            x.data.clamp_(-clip, clip)
+            x.detach().clamp_(-clip, clip)
 
 
 def read_txt_embeddings(params, emb_path, lang, full_vocab):

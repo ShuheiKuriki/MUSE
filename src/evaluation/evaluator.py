@@ -224,6 +224,7 @@ class Evaluator:
         """
         Run all evaluations.
         """
+        self.generator.eval()
         for i in range(self.params.langnum):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i, to_log)
