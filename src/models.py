@@ -63,7 +63,6 @@ class Generator(nn.Module):
     def forward(self, x, i):
         """map into target space"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        print(self.mappings[i].requires_grad)
         return self.mappings[i](x)
 
     def orthogonalize(self):
