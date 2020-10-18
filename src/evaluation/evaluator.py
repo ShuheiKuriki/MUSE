@@ -42,9 +42,9 @@ class Evaluator:
         Evaluation on monolingual word similarity.
         """
         if i < self.params.langnum-1:
-            emb = self.generator(self.embs[i].weight, i)
+            emb = self.generator(self.embs[i].weight.detach(), i)
         else:
-            emb = self.embs[i].weight
+            emb = self.embs[i].weight.detach()
         ws_scores = get_wordsim_scores(
             self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy()
         )
@@ -85,11 +85,11 @@ class Evaluator:
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach().cpu().numpy()
         else:
-            src_emb = self.generator(self.embs[i].weight, i).detach().cpu().numpy()
+            src_emb = self.generator(self.embs[i].weight.detach(), i).detach().cpu().numpy()
         if j == self.params.langnum-1:
             tgt_emb = self.embs[j].weight.detach().cpu().numpy()
         else:
-            tgt_emb = self.generator(self.embs[j].weight, j).detach().cpu().numpy()
+            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach().cpu().numpy()
         # tgt_emb = self.src_mapping(self.tgt_emb.weight).detach().cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
@@ -111,11 +111,11 @@ class Evaluator:
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach()
         else:
-            src_emb = self.generator(self.embs[i].weight, i).detach()
+            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
         if j == self.params.langnum-1:
             tgt_emb = self.embs[j].weight.detach()
         else:
-            tgt_emb = self.generator(self.embs[j].weight, j).detach()
+            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(
@@ -150,11 +150,11 @@ class Evaluator:
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach()
         else:
-            src_emb = self.generator(self.embs[i].weight, i).detach()
+            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
         if j == self.params.langnum-1:
             tgt_emb = self.embs[j].weight.detach()
         else:
-            tgt_emb = self.generator(self.embs[j].weight, j).detach()
+            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
 
@@ -188,11 +188,11 @@ class Evaluator:
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach()
         else:
-            src_emb = self.generator(self.embs[i].weight, i).detach()
+            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
         if j == self.params.langnum-1:
             tgt_emb = self.embs[j].weight.detach()
         else:
-            tgt_emb = self.generator(self.embs[j].weight, j).detach()
+            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
@@ -252,7 +252,7 @@ class Evaluator:
                 for j in range(0, self.embs[i].num_embeddings, bs):
                     emb = self.embs[i].weight[j:j + bs].detach()
                     if i < langnum-1:
-                        preds = self.discriminator(self.generator[i](emb))
+                        preds = self.discriminator(self.generator[i](emb).detach())
                     else:
                         preds = self.discriminator(emb)
                 preds_[i].extend(preds.detach().cpu().tolist())

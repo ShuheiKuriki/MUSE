@@ -71,7 +71,7 @@ class Trainer():
         # get word embeddings
         embs = [0]*langnum
         for i in range(langnum):
-            embs[i] = self.embs[i](ids[i])
+            embs[i] = self.embs[i](ids[i]).detach()
         for i in range(langnum-1):
             embs[i] = self.generator(embs[i], i)
 
@@ -94,7 +94,7 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x)
+        preds = self.discriminator(x.detach())
         # loss = F.cross_entropy(preds, y)
         loss = F.binary_cross_entropy(preds, y)
         # print(loss)
@@ -119,7 +119,6 @@ class Trainer():
             return 0
 
         self.discriminator.eval()
-        self.generator.train()
 
         # loss
         x, y = self.get_dis_xy()
@@ -204,7 +203,7 @@ class Trainer():
     #     if self.params.gen_beta > 0:
     #         beta = self.params.gen_beta
     #         for i in range(self.params.langnum-1):
-    #             W = self.genarator[i].weight.detach()
+    #             W = self.generator[i].weight.detach()
     #             W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
 
     def update_lr(self, to_log, metric):
@@ -285,7 +284,7 @@ class Trainer():
     #         for i, k in enumerate(range(0, len(embs[j]), bs)):
     #             with torch.no_grad():
     #                 x = embs[j][k:k + bs].cuda() if params.cuda else embs[j][k:k + bs]
-    #             embs[j][k:k + bs] = self.genarator[j](x).detach().cpu()
+    #             embs[j][k:k + bs] = self.generator[j](x).detach().cpu()
 
     #     # write embeddings to the disk
     #     export_embeddings(embs, params)
