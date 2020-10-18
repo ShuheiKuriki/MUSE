@@ -1,3 +1,4 @@
+"""GAN models"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -12,6 +13,7 @@ from .utils import load_embeddings, normalize_embeddings
 
 
 class Discriminator(nn.Module):
+    """discriminator"""
 
     def __init__(self, params):
         super(Discriminator, self).__init__()
@@ -36,8 +38,36 @@ class Discriminator(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
+        """make predictions"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
         return self.layers(x).view(-1)
+
+class Generator(nn.Module):
+    """mapping"""
+
+    def __init__(self, params):
+        super(Generator, self).__init__()
+
+        self.emb_dim = params.emb_dim
+        self.map_beta = params.map_beta
+
+        self.mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
+        if getattr(params, 'map_id_init', True):
+            self.mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+
+    def forward(self, x):
+        """map into target space"""
+        assert x.dim() == 2 and x.size(1) == self.emb_dim
+        return self.mapping(x)
+
+    def orthogonalize(self):
+        """
+        Orthogonalize the mapping.
+        """
+        beta = self.map_beta
+        if beta > 0:
+            W = self.mapping.weight.detach()
+            W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
 
 
 def build_model(params, with_dis):
@@ -60,9 +90,10 @@ def build_model(params, with_dis):
         tgt_emb = None
 
     # mapping
-    mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
-    if getattr(params, 'map_id_init', True):
-        mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+    # mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
+    # if getattr(params, 'map_id_init', True):
+    #     mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+    genarator = Generator(params)
 
     # discriminator
     discriminator = Discriminator(params) if with_dis else None
@@ -72,7 +103,7 @@ def build_model(params, with_dis):
         src_emb.cuda()
         if params.tgt_lang:
             tgt_emb.cuda()
-        mapping.cuda()
+        genarator.cuda()
         if with_dis:
             discriminator.cuda()
 
@@ -81,4 +112,4 @@ def build_model(params, with_dis):
     if params.tgt_lang:
         params.tgt_mean = normalize_embeddings(tgt_emb.weight.data, params.normalize_embeddings)
 
-    return src_emb, tgt_emb, mapping, discriminator
+    return src_emb, tgt_emb, genarator, discriminator

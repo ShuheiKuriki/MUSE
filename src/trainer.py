@@ -26,7 +26,8 @@ logger = getLogger()
 
 class Trainer():
     """muse trainer"""
-    def __init__(self, src_emb, tgt_emb, mapping, discriminator, params):
+
+    def __init__(self, src_emb, tgt_emb, genarator, discriminator, params):
         """
         Initialize trainer script.
         """
@@ -34,14 +35,14 @@ class Trainer():
         self.tgt_emb = tgt_emb
         self.src_dico = params.src_dico
         self.tgt_dico = getattr(params, 'tgt_dico', None)
-        self.mapping = mapping
+        self.genarator = genarator
         self.discriminator = discriminator
         self.params = params
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            self.map_optimizer = optim_fn(mapping.parameters(), **optim_params)
+            self.map_optimizer = optim_fn(genarator.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -72,11 +73,11 @@ class Trainer():
             with torch.no_grad():
                 src_emb = self.src_emb(src_ids)
                 tgt_emb = self.tgt_emb(tgt_ids)
-                src_emb = self.mapping(src_emb.detach())
+                src_emb = self.genarator(src_emb.detach())
         else:
             src_emb = self.src_emb(src_ids)
             tgt_emb = self.tgt_emb(tgt_ids)
-            src_emb = self.mapping(src_emb.detach())
+            src_emb = self.genarator(src_emb.detach())
 
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
@@ -92,6 +93,7 @@ class Trainer():
         Train the discriminator.
         """
         self.discriminator.train()
+        self.genarator.eval()
 
         # loss
         x, y = self.get_dis_xy(volatile=True)
@@ -111,7 +113,7 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
-    def mapping_step(self, stats):
+    def genarator_step(self, stats):
         """
         Fooling discriminator training step.
         """
@@ -119,6 +121,7 @@ class Trainer():
             return 0
 
         self.discriminator.eval()
+        self.genarator.train()
 
         # loss
         x, y = self.get_dis_xy(volatile=False)
@@ -136,7 +139,7 @@ class Trainer():
         self.map_optimizer.zero_grad()
         loss.backward()
         self.map_optimizer.step()
-        self.orthogonalize()
+        self.genarator.orthogonalize()
 
         return 2 * self.params.batch_size
 
@@ -187,14 +190,14 @@ class Trainer():
         U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
         W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
 
-    def orthogonalize(self):
-        """
-        Orthogonalize the mapping.
-        """
-        if self.params.map_beta > 0:
-            W = self.mapping.weight.detach()
-            beta = self.params.map_beta
-            W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
+    # def orthogonalize(self):
+    #     """
+    #     Orthogonalize the mapping.
+    #     """
+    #     if self.params.map_beta > 0:
+    #         W = self.mapping.weight.detach()
+    #         beta = self.params.map_beta
+    #         W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
 
     def update_lr(self, to_log, metric):
         """
@@ -231,7 +234,7 @@ class Trainer():
             self.best_valid_metric = to_log[metric]
             logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the mapping
-            W = self.mapping.weight.detach().cpu().numpy()
+            W = self.genarator.mapping.weight.detach().cpu().numpy()
             path = os.path.join(self.params.exp_path, 'best_mapping.pth')
             logger.info('* Saving the mapping to %s ...', path)
             torch.save(W, path)
@@ -245,7 +248,7 @@ class Trainer():
         # reload the model
         assert os.path.isfile(path)
         to_reload = torch.from_numpy(torch.load(path))
-        W = self.mapping.weight.detach()
+        W = self.genarator.mapping.weight.detach()
         assert to_reload.size() == W.size()
         W.copy_(to_reload.type_as(W))
 
@@ -272,7 +275,7 @@ class Trainer():
                 x = src_emb[k:k + bs]
                 if params.cuda:
                     x = x.cuda()
-            src_emb[k:k + bs] = self.mapping(x).detach().cpu()
+            src_emb[k:k + bs] = self.genarator(x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(src_emb, tgt_emb, params)

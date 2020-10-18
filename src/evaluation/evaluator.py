@@ -34,7 +34,7 @@ class Evaluator():
         self.tgt_emb = trainer.tgt_emb
         self.src_dico = trainer.src_dico
         self.tgt_dico = trainer.tgt_dico
-        self.mapping = trainer.mapping
+        self.genarator = trainer.genarator
         self.discriminator = trainer.discriminator
         self.params = trainer.params
 
@@ -44,7 +44,7 @@ class Evaluator():
         """
         src_ws_scores = get_wordsim_scores(
             self.src_dico.lang, self.src_dico.word2id,
-            self.mapping(self.src_emb.weight).detach().cpu().numpy()
+            self.genarator(self.src_emb.weight).detach().cpu().numpy()
         )
         tgt_ws_scores = get_wordsim_scores(
             self.tgt_dico.lang, self.tgt_dico.word2id,
@@ -71,7 +71,7 @@ class Evaluator():
         """
         src_analogy_scores = get_wordanalogy_scores(
             self.src_dico.lang, self.src_dico.word2id,
-            self.mapping(self.src_emb.weight).detach().cpu().numpy()
+            self.genarator(self.src_emb.weight).detach().cpu().numpy()
         )
         if self.params.tgt_lang:
             tgt_analogy_scores = get_wordanalogy_scores(
@@ -93,7 +93,7 @@ class Evaluator():
         """
         Evaluation on cross-lingual word similarity.
         """
-        src_emb = self.mapping(self.src_emb.weight).detach().cpu().numpy()
+        src_emb = self.genarator(self.src_emb.weight).detach().cpu().numpy()
         tgt_emb = self.tgt_emb.weight.detach().cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
@@ -112,7 +112,7 @@ class Evaluator():
         Evaluation on word translation.
         """
         # mapped word embeddings
-        src_emb = self.mapping(self.src_emb.weight).detach()
+        src_emb = self.genarator(self.src_emb.weight).detach()
         tgt_emb = self.tgt_emb.weight.detach()
 
         for method in ['nn', 'csls_knn_10']:
@@ -148,7 +148,7 @@ class Evaluator():
             return
 
         # mapped word embeddings
-        src_emb = self.mapping(self.src_emb.weight).detach()
+        src_emb = self.genarator(self.src_emb.weight).detach()
         tgt_emb = self.tgt_emb.weight.detach()
 
         # get idf weights
@@ -181,7 +181,7 @@ class Evaluator():
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.mapping(self.src_emb.weight).detach()
+        src_emb = self.genarator(self.src_emb.weight).detach()
         tgt_emb = self.tgt_emb.weight.detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
@@ -232,7 +232,7 @@ class Evaluator():
 
         with no_grad():
             for i in range(0, self.src_emb.num_embeddings, bs):
-                preds = self.discriminator(self.mapping(self.src_emb.weight[i:i + bs].detach()))
+                preds = self.discriminator(self.genarator(self.src_emb.weight[i:i + bs].detach()))
                 src_preds.extend(preds.detach().cpu().tolist())
 
             for i in range(0, self.tgt_emb.num_embeddings, bs):

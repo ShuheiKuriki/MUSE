@@ -99,8 +99,8 @@ assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 logger = initialize_exp(params)
-src_emb, tgt_emb, mapping, discriminator = build_model(params, True)
-trainer = Trainer(src_emb, tgt_emb, mapping, discriminator, params)
+src_emb, tgt_emb, genarator, discriminator = build_model(params, True)
+trainer = Trainer(src_emb, tgt_emb, genarator, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -123,7 +123,7 @@ if params.adversarial:
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.mapping_step(stats)
+            n_words_proc += trainer.genarator_step(stats)
 
             # log stats
             if n_iter % 500 == 0:
@@ -147,7 +147,7 @@ if params.adversarial:
 
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s", json.dumps(to_log))
-        trainer.save_best(to_log, VALIDATION_METRIC)
+        trainer.saven_best(to_log, VALIDATION_METRIC)
         logger.info('End of epoch %i.\n\n', n_epoch)
 
         # update the learning rate (stop if too small)
