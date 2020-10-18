@@ -53,7 +53,7 @@ class Generator(nn.Module):
 
         self.mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
         if getattr(params, 'map_id_init', True):
-            self.mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
+            self.mapping.weight.detach().copy_(torch.diag(torch.ones(params.emb_dim)))
 
     def forward(self, x):
         """map into target space"""
@@ -78,14 +78,16 @@ def build_model(params, with_dis):
     src_dico, _src_emb = load_embeddings(params, source=True)
     params.src_dico = src_dico
     src_emb = nn.Embedding(len(src_dico), params.emb_dim, sparse=True)
-    src_emb.weight.data.copy_(_src_emb)
+    src_emb.weight.detach().copy_(_src_emb)
+    src_emb.weight.requires_grad = False
 
     # target embeddings
     if params.tgt_lang:
         tgt_dico, _tgt_emb = load_embeddings(params, source=False)
         params.tgt_dico = tgt_dico
         tgt_emb = nn.Embedding(len(tgt_dico), params.emb_dim, sparse=True)
-        tgt_emb.weight.data.copy_(_tgt_emb)
+        tgt_emb.weight.detach().copy_(_tgt_emb)
+        tgt_emb.weight.requires_grad = False
     else:
         tgt_emb = None
 
@@ -108,8 +110,8 @@ def build_model(params, with_dis):
             discriminator.cuda()
 
     # normalize embeddings
-    params.src_mean = normalize_embeddings(src_emb.weight.data, params.normalize_embeddings)
+    params.src_mean = normalize_embeddings(src_emb.weight.detach(), params.normalize_embeddings)
     if params.tgt_lang:
-        params.tgt_mean = normalize_embeddings(tgt_emb.weight.data, params.normalize_embeddings)
+        params.tgt_mean = normalize_embeddings(tgt_emb.weight.detach(), params.normalize_embeddings)
 
     return src_emb, tgt_emb, genarator, discriminator

@@ -54,7 +54,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self, volatile):
+    def get_dis_xy(self):
         """
         Get discriminator input batch / output target.
         """
@@ -71,14 +71,7 @@ class Trainer():
         # get word embeddings
         with torch.no_grad():
             tgt_emb = self.tgt_emb(tgt_ids)
-        if volatile:
-            with torch.no_grad():
-                src_emb = self.src_emb(src_ids)
-                src_emb = self.genarator(src_emb.detach())
-        else:
-            src_emb = self.src_emb(src_ids)
-            # tgt_emb = self.tgt_emb(tgt_ids)
-            src_emb = self.genarator(src_emb.detach())
+        src_emb = self.genarator(self.src_emb(src_ids).detach())
 
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
@@ -97,8 +90,8 @@ class Trainer():
         self.genarator.eval()
 
         # loss
-        x, y = self.get_dis_xy(volatile=True)
-        preds = self.discriminator(x.detach())
+        x, y = self.get_dis_xy()
+        preds = self.discriminator(x)
         loss = F.binary_cross_entropy(preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
@@ -125,7 +118,7 @@ class Trainer():
         self.genarator.train()
 
         # loss
-        x, y = self.get_dis_xy(volatile=False)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x)
         loss = F.binary_cross_entropy(preds, 1 - y)
         # loss = F.cross_entropy(preds, 1 - y)

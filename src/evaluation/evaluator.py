@@ -214,6 +214,7 @@ class Evaluator():
         """
         Run all evaluations.
         """
+        self.generator.eval()
         self.monolingual_wordsim(to_log)
         self.crosslingual_wordsim(to_log)
         self.word_translation(to_log)
