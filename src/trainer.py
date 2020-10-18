@@ -27,7 +27,7 @@ logger = getLogger()
 class Trainer():
     """muse trainer"""
 
-    def __init__(self, src_emb, tgt_emb, genarator, discriminator, params):
+    def __init__(self, src_emb, tgt_emb, generator, discriminator, params):
         """
         Initialize trainer script.
         """
@@ -35,14 +35,14 @@ class Trainer():
         self.tgt_emb = tgt_emb
         self.src_dico = params.src_dico
         self.tgt_dico = getattr(params, 'tgt_dico', None)
-        self.genarator = genarator
+        self.generator = generator
         self.discriminator = discriminator
         self.params = params
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
             optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            self.map_optimizer = optim_fn(genarator.parameters(), **optim_params)
+            self.map_optimizer = optim_fn(generator.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -69,10 +69,11 @@ class Trainer():
             tgt_ids = tgt_ids.cuda()
 
         # get word embeddings
-        with torch.no_grad():
-            tgt_emb = self.tgt_emb(tgt_ids)
-        src_emb = self.genarator(self.src_emb(src_ids).detach())
-
+        # print(1, self.src_emb(torch.LongTensor([0]).cuda()).detach()[0][0].item())
+        # print(2, self.tgt_emb(torch.LongTensor([0]).cuda()).detach()[0][0].item())
+        src_emb = self.src_emb(src_ids).detach()
+        tgt_emb = self.tgt_emb(tgt_ids).detach()
+        src_emb = self.generator(src_emb)
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
         y = torch.FloatTensor(2 * bs).zero_()
@@ -87,11 +88,10 @@ class Trainer():
         Train the discriminator.
         """
         self.discriminator.train()
-        self.genarator.eval()
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x)
+        preds = self.discriminator(x.detach())
         loss = F.binary_cross_entropy(preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
@@ -115,7 +115,6 @@ class Trainer():
             return 0
 
         self.discriminator.eval()
-        self.genarator.train()
 
         # loss
         x, y = self.get_dis_xy()
@@ -133,7 +132,9 @@ class Trainer():
         self.map_optimizer.zero_grad()
         loss.backward()
         self.map_optimizer.step()
-        self.genarator.orthogonalize()
+        # print(1, self.generator.mapping.weight[0][0].item())
+        self.generator.orthogonalize()
+        # print(2, self.generator.mapping.weight[0][0].item())
 
         return 2 * self.params.batch_size
 
@@ -228,7 +229,7 @@ class Trainer():
             self.best_valid_metric = to_log[metric]
             logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the mapping
-            W = self.genarator.mapping.weight.detach().cpu().numpy()
+            W = self.generator.mapping.weight.detach().cpu().numpy()
             path = os.path.join(self.params.exp_path, 'best_mapping.pth')
             logger.info('* Saving the mapping to %s ...', path)
             torch.save(W, path)
@@ -242,7 +243,7 @@ class Trainer():
         # reload the model
         assert os.path.isfile(path)
         to_reload = torch.from_numpy(torch.load(path))
-        W = self.genarator.mapping.weight.detach()
+        W = self.generator.mapping.weight.detach()
         assert to_reload.size() == W.size()
         W.copy_(to_reload.type_as(W))
 
@@ -269,7 +270,7 @@ class Trainer():
                 x = src_emb[k:k + bs]
                 if params.cuda:
                     x = x.cuda()
-            src_emb[k:k + bs] = self.genarator(x).detach().cpu()
+            src_emb[k:k + bs] = self.generator(x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(src_emb, tgt_emb, params)

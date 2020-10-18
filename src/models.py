@@ -79,7 +79,6 @@ def build_model(params, with_dis):
     params.src_dico = src_dico
     src_emb = nn.Embedding(len(src_dico), params.emb_dim, sparse=True)
     src_emb.weight.detach().copy_(_src_emb)
-    src_emb.weight.requires_grad = False
 
     # target embeddings
     if params.tgt_lang:
@@ -87,7 +86,6 @@ def build_model(params, with_dis):
         params.tgt_dico = tgt_dico
         tgt_emb = nn.Embedding(len(tgt_dico), params.emb_dim, sparse=True)
         tgt_emb.weight.detach().copy_(_tgt_emb)
-        tgt_emb.weight.requires_grad = False
     else:
         tgt_emb = None
 
@@ -95,7 +93,7 @@ def build_model(params, with_dis):
     # mapping = nn.Linear(params.emb_dim, params.emb_dim, bias=False)
     # if getattr(params, 'map_id_init', True):
     #     mapping.weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
-    genarator = Generator(params)
+    generator = Generator(params)
 
     # discriminator
     discriminator = Discriminator(params) if with_dis else None
@@ -105,7 +103,7 @@ def build_model(params, with_dis):
         src_emb.cuda()
         if params.tgt_lang:
             tgt_emb.cuda()
-        genarator.cuda()
+        generator.cuda()
         if with_dis:
             discriminator.cuda()
 
@@ -114,4 +112,4 @@ def build_model(params, with_dis):
     if params.tgt_lang:
         params.tgt_mean = normalize_embeddings(tgt_emb.weight.detach(), params.normalize_embeddings)
 
-    return src_emb, tgt_emb, genarator, discriminator
+    return src_emb, tgt_emb, generator, discriminator
