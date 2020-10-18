@@ -55,7 +55,7 @@ parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adv
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Genarator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
@@ -98,8 +98,8 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-embs, mappings, discriminator = build_model(params, True)
-trainer = Trainer(embs, mappings, discriminator, params)
+embs, generator, discriminator = build_model(params, True)
+trainer = Trainer(embs, generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -123,7 +123,7 @@ if params.adversarial:
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.mapping_step()
+            n_words_proc += trainer.gen_step()
 
             # log stats
             if n_iter % 500 == 0:
@@ -152,7 +152,7 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
+        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
             logger.info('Learning rate < 1e-6. BREAK.')
             break
 
