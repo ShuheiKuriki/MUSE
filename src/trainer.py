@@ -69,14 +69,15 @@ class Trainer():
             tgt_ids = tgt_ids.cuda()
 
         # get word embeddings
+        with torch.no_grad():
+            tgt_emb = self.tgt_emb(tgt_ids)
         if volatile:
             with torch.no_grad():
                 src_emb = self.src_emb(src_ids)
-                tgt_emb = self.tgt_emb(tgt_ids)
                 src_emb = self.genarator(src_emb.detach())
         else:
             src_emb = self.src_emb(src_ids)
-            tgt_emb = self.tgt_emb(tgt_ids)
+            # tgt_emb = self.tgt_emb(tgt_ids)
             src_emb = self.genarator(src_emb.detach())
 
         # input / target
