@@ -69,6 +69,8 @@ class Trainer():
                 ids[i] = ids[i].cuda()
 
         # get word embeddings
+        # print(1, self.embs[0](torch.LongTensor([0])).detach()[0][0].item())
+        # print(1, self.embs[1](torch.LongTensor([0])).detach()[0][0].item())
         embs = [0]*langnum
         for i in range(langnum):
             embs[i] = self.embs[i](ids[i]).detach()
@@ -78,9 +80,13 @@ class Trainer():
         # input / target
         x = torch.cat(embs, 0)
         # y = torch.zeros(langnum * bs, dtype=torch.int64)
-        y = torch.FloatTensor(langnum * bs).zero_()
+        # y = torch.zeros((langnum * bs, langnum), dtype=torch.int64)
+        y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
+        y[:, :] = self.params.dis_smooth/(langnum-1)
+        # for i in range(langnum):
+            # y[i*bs:(i+1)*bs] = i#1-i+self.params.dis_smooth*(2*i-1)
         for i in range(langnum):
-            y[i*bs:(i+1)*bs] = 1-i+self.params.dis_smooth*(2*i-1)
+            y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
         y = y.cuda() if self.params.cuda else y
 
         return x, y
@@ -95,8 +101,10 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
+        loss = torch.mean(torch.sum(-y*preds, dim=1))
+        loss *= self.params.dis_lambda
         # loss = F.cross_entropy(preds, y)
-        loss = F.binary_cross_entropy(preds, y)
+        # loss = F.binary_cross_entropy(preds, y)
         # print(loss)
         stats['DIS_COSTS'].append(loss.detach().item())
 
@@ -123,8 +131,11 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x)
-        # loss = self.params.dis_lambda * F.cross_entropy(preds, 1-y)
-        loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
+        loss = 0
+        # print(y)
+        loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
+        loss *= self.params.dis_lambda# * F.cross_entropy(preds, 1-y)
+        # loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
         # print(loss)
 
         # check NaN
@@ -136,7 +147,9 @@ class Trainer():
         self.gen_optimizer.zero_grad()
         loss.backward()
         self.gen_optimizer.step()
+        # print(1, self.generator.mappings[0].weight[0][0].item())
         self.generator.orthogonalize()
+        # print(2, self.generator.mappings[0].weight[0][0].item())
 
         return self.params.langnum * self.params.batch_size
 
