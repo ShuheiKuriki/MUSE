@@ -22,7 +22,6 @@ from src.evaluation import Evaluator
 
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 
-
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
@@ -33,7 +32,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
-parser.add_argument("--langs", type=str, default='en_es', help="Source language")
+parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 # parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
 # parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
@@ -56,7 +55,7 @@ parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adv
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
@@ -99,8 +98,8 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-embs, target, mappings, discriminator = build_model(params, True)
-trainer = Trainer(embs, target, mappings, discriminator, params)
+embs, generator, discriminator = build_model(params, True)
+trainer = Trainer(embs, generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -118,12 +117,13 @@ if params.adversarial:
 
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
+
             # discriminator training
             for _ in range(params.dis_steps):
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.mapping_step(stats)
+            n_words_proc += trainer.gen_step()
 
             # log stats
             if n_iter % 500 == 0:
@@ -152,7 +152,7 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
+        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
             logger.info('Learning rate < 1e-6. BREAK.')
             break
 
