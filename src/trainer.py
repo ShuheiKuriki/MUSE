@@ -91,8 +91,8 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x.detach())
-        loss = F.binary_cross_entropy(preds, y)
+        dis_preds = self.discriminator(x.detach())
+        loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
 
