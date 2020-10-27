@@ -53,7 +53,7 @@ def initialize_exp(params):
         np.random.seed(params.seed)
         torch.manual_seed(params.seed)
         if params.cuda:
-            torch.cuda.manual_seed(params.seed)
+            torch.cuda.manual_seed_all(params.seed)
 
     # dump parameters
     params.exp_path = get_exp_path(params)

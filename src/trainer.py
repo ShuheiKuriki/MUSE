@@ -100,7 +100,6 @@ class Trainer():
         Train the discriminator.
         """
         self.discriminator.train()
-        self.generator.eval()
 
         # loss
         x, y = self.get_dis_xy()
