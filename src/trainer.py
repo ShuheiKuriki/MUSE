@@ -73,11 +73,12 @@ class Trainer():
             tgt_ids = tgt_ids.cuda()
 
         # get word embeddings
-        # print(1, self.src_emb(torch.LongTensor([0]).cuda()).detach()[0][0].item())
-        # print(2, self.tgt_emb(torch.LongTensor([0]).cuda()).detach()[0][0].item())
         src_emb = self.src_emb(src_ids).detach()
         tgt_emb = self.tgt_emb(tgt_ids).detach()
         src_emb = self.generator(src_emb)
+        if self.params.test:
+            logger.info(self.src_emb.weight.detach()[0][:10])
+            logger.info(self.tgt_emb.weight.detach()[0][:10])
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
         y = torch.FloatTensor(2 * bs).zero_()
