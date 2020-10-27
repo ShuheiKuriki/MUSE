@@ -28,24 +28,24 @@ class Discriminator(nn.Module):
         layers = [nn.Dropout(self.dis_input_dropout)]
         for i in range(self.dis_layers + 1):
             input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
-            output_dim = params.langnum if i == self.dis_layers else self.dis_hid_dim
-            # output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
+            # output_dim = params.langnum if i == self.dis_layers else self.dis_hid_dim
+            output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
             layers.append(nn.Linear(input_dim, output_dim))
             if i < self.dis_layers:
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
-        # layers.append(nn.Sigmoid())
-        if params.test:
-            layers.append(nn.Softmax(dim=1))
-        else:
-            layers.append(nn.LogSoftmax(dim=1))
+        layers.append(nn.Sigmoid())
+        # if params.test:
+            # layers.append(nn.Softmax(dim=1))
+        # else:
+            # layers.append(nn.LogSoftmax(dim=1))
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
         """calculate forward"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        output = self.layers(x).view(-1, self.params.langnum)
-        # output = self.layers(x).view(-1)
+        # output = self.layers(x).view(-1, self.params.langnum)
+        output = self.layers(x).view(-1)
         # print(output)
         return output
 

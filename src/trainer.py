@@ -82,14 +82,14 @@ class Trainer():
 
         # input / target
         x = torch.cat(embs, 0)
-        # y = torch.zeros(langnum * bs, dtype=torch.int64)
+        y = torch.zeros(langnum * bs, dtype=torch.float32)
         # y = torch.zeros((langnum * bs, langnum), dtype=torch.int64)
-        y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        y[:, :] = self.params.dis_smooth/(langnum-1)
-        # for i in range(langnum):
-            # y[i*bs:(i+1)*bs] = i#1-i+self.params.dis_smooth*(2*i-1)
+        # y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
+        # y[:, :] = self.params.dis_smooth/(langnum-1)
         for i in range(langnum):
-            y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
+            y[i*bs:(i+1)*bs] = 1-i+self.params.dis_smooth*(2*i-1)
+        # for i in range(langnum):
+            # y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
         y = y.cuda() if self.params.cuda else y
 
         return x, y
@@ -104,10 +104,10 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
-        loss = torch.mean(torch.sum(-y*preds, dim=1))
-        loss *= self.params.dis_lambda
+        # loss = torch.mean(torch.sum(-y*preds, dim=1))
         # loss = F.cross_entropy(preds, y)
-        # loss = F.binary_cross_entropy(preds, y)
+        loss = F.binary_cross_entropy(preds, y)
+        loss *= self.params.dis_lambda
         # print(loss)
         stats['DIS_COSTS'].append(loss.detach().item())
 
@@ -138,9 +138,9 @@ class Trainer():
         preds = self.discriminator(x)
         loss = 0
         # print(y)
-        loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
+        # loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
         loss *= self.params.dis_lambda# * F.cross_entropy(preds, 1-y)
-        # loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
+        loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
         # print(loss)
         stats['MAP_COSTS'].append(loss.detach().item())
 
