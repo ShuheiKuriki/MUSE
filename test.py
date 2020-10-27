@@ -101,9 +101,10 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
 stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-trainer.dis_step(stats)
+for _ in range(5):
+    trainer.dis_step(stats)
 # mapping training (discriminator fooling)
-trainer.gen_step(stats)
+    trainer.gen_step(stats)
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
 stats_log = ' - '.join(stats_log)
