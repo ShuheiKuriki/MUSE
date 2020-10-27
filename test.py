@@ -105,7 +105,8 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
 if params.test_type == 'dis':
-    trainer.dis_step(stats)
+    for i in range(20):
+        trainer.dis_step(stats)
     stats_str = [('DIS_COSTS', 'Discriminator loss')]
 # mapping training (discriminator fooling)
 else:
