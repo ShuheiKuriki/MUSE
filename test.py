@@ -69,10 +69,6 @@ parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum genera
 # parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
 # parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
-# test
-parser.add_argument("--test", type=bool_flag, default=True, help="do test or not")
-parser.add_argument("--test_type", type=str, default="dis", help="which should I test, discriminater(dis) or generater(gen)?")
-
 
 # parse parameters
 params = parser.parse_args()
@@ -89,6 +85,7 @@ assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 logger = initialize_exp(params)
+params.test = True
 params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
@@ -103,13 +100,10 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
-if params.test_type == 'dis':
-    trainer.dis_step(stats)
-    stats_str = [('DIS_COSTS', 'Discriminator loss')]
+stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
+trainer.dis_step(stats)
 # mapping training (discriminator fooling)
-else:
-    trainer.gen_step(stats)
-    stats_str = [('MAP_COSTS', 'Mapping loss')]
+trainer.gen_step(stats)
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
 stats_log = ' - '.join(stats_log)
