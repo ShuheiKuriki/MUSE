@@ -44,7 +44,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
-parser.add_argument("--dis_input_dropout", type=float, default=0., help="Discriminator input dropout")
+parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
 parser.add_argument("--dis_steps", type=int, default=5, help="Discriminator steps")
 parser.add_argument("--dis_lambda", type=float, default=1, help="Discriminator loss feedback coefficient")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
@@ -104,9 +104,10 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
 stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-trainer.dis_step(stats)
-# mapping training (discriminator fooling)
-trainer.generator_step(stats)
+for _ in range(5):
+    trainer.dis_step(stats)
+    # mapping training (discriminator fooling)
+    trainer.generator_step(stats)
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
 stats_log = ' - '.join(stats_log)

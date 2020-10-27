@@ -76,9 +76,6 @@ class Trainer():
         src_emb = self.src_emb(src_ids).detach()
         tgt_emb = self.tgt_emb(tgt_ids).detach()
         src_emb = self.generator(src_emb)
-        if self.params.test:
-            logger.info(self.src_emb.weight.detach()[0][:10])
-            logger.info(self.tgt_emb.weight.detach()[0][:10])
         # input / target
         x = torch.cat([src_emb, tgt_emb], 0)
         y = torch.FloatTensor(2 * bs).zero_()
@@ -98,7 +95,9 @@ class Trainer():
         x, y = self.get_dis_xy()
         dis_preds = self.discriminator(x.detach())
         if self.params.test:
-            logger.info(self.discriminator(x.detach()))
+            logger.info('dis_start')
+            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.generator.mapping.weight[0][:10])
         loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())
@@ -114,6 +113,7 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
+            logger.info('after_dis')
             logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
 
@@ -125,9 +125,12 @@ class Trainer():
             return 0
 
         self.discriminator.eval()
-
         # loss
         x, y = self.get_dis_xy()
+        if self.params.test:
+            logger.info('gen_start')
+            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.generator.mapping.weight[0][:10])
         dis_preds = self.discriminator(x)
         loss = F.binary_cross_entropy(dis_preds, 1 - y)
         # loss = F.cross_entropy(preds, 1 - y)
@@ -144,9 +147,12 @@ class Trainer():
         loss.backward()
         self.gen_optimizer.step()
         if self.params.test:
+            logger.info('after_gen')
+            logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
+            logger.info('orthogonalized')
             logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
 
