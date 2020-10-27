@@ -43,7 +43,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
-parser.add_argument("--dis_input_dropout", type=float, default=0., help="Discriminator input dropout")
+parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
 parser.add_argument("--dis_steps", type=int, default=5, help="Discriminator steps")
 parser.add_argument("--dis_lambda", type=float, default=1, help="Discriminator loss feedback coefficient")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")

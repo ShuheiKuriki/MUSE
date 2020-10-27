@@ -105,6 +105,7 @@ class Trainer():
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
         if self.params.test:
+            logger.info('dis_start')
             logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(preds[:10])
         # loss = torch.mean(torch.sum(-y*preds, dim=1))
@@ -125,6 +126,7 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
+            logger.info('after_dis')
             logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(self.discriminator(x.detach())[:10])
 
@@ -141,6 +143,7 @@ class Trainer():
         x, y = self.get_dis_xy()
         preds = self.discriminator(x)
         if self.params.test:
+            logger.info('gen_start')
             logger.info(self.generator.mappings[0].weight[0][:10])
         loss = 0
         # print(y)
@@ -160,10 +163,12 @@ class Trainer():
         loss.backward()
         self.gen_optimizer.step()
         if self.params.test:
+            logger.info('after_gen')
             logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(self.discriminator(x.detach())[:10])
         self.generator.orthogonalize()
         if self.params.test:
+            logger.info('orthogonalized')
             logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(self.discriminator(x.detach())[:10])
 
