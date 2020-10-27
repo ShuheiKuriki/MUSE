@@ -72,13 +72,14 @@ class Trainer():
                 ids[i] = ids[i].cuda()
 
         # get word embeddings
-        # print(1, self.embs[0](torch.LongTensor([0])).detach()[0][0].item())
-        # print(1, self.embs[1](torch.LongTensor([0])).detach()[0][0].item())
         embs = [0]*langnum
         for i in range(langnum):
             embs[i] = self.embs[i](ids[i]).detach()
         for i in range(langnum-1):
             embs[i] = self.generator(embs[i], i)
+        if self.params.test:
+            logger.info(self.embs[0].weight.detach()[0][:10])
+            logger.info(self.embs[1].weight.detach()[0][:10])
 
         # input / target
         x = torch.cat(embs, 0)
@@ -104,6 +105,8 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
+        if self.params.test:
+            logger.info(preds)
         # loss = torch.mean(torch.sum(-y*preds, dim=1))
         # loss = F.cross_entropy(preds, y)
         loss = F.binary_cross_entropy(preds, y)
