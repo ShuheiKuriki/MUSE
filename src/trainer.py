@@ -114,7 +114,8 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
-            logger.info(self.discriminator(x.detach()))
+            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.generator.mapping.weight[0][:10])
 
     def generator_step(self, stats):
         """
@@ -146,6 +147,7 @@ class Trainer():
             logger.info(self.generator.mapping.weight[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
+            logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
 
         return 2 * self.params.batch_size
