@@ -64,7 +64,10 @@ class Trainer():
         assert mf <= min(map(len, self.dicos))
         ids = [0]*langnum
         for i in range(langnum):
-            ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
+            if self.params.test:
+                ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
+            else:
+                ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
             if self.params.cuda:
                 ids[i] = ids[i].cuda()
 
@@ -118,8 +121,10 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
+        if self.params.test:
+            print(self.discriminator(x.detach()))
 
-    def gen_step(self):
+    def gen_step(self, stats):
         """
         Fooling discriminator training step.
         """
@@ -137,6 +142,7 @@ class Trainer():
         loss *= self.params.dis_lambda# * F.cross_entropy(preds, 1-y)
         # loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
         # print(loss)
+        stats['MAP_COSTS'].append(loss.detach().item())
 
         # check NaN
         if (loss != loss).detach().any():
@@ -147,9 +153,11 @@ class Trainer():
         self.gen_optimizer.zero_grad()
         loss.backward()
         self.gen_optimizer.step()
-        # print(1, self.generator.mappings[0].weight[0][0].item())
+        if self.params.test:
+            logger.info(self.generator.mappings[0].weight[0][:10])
         self.generator.orthogonalize()
-        # print(2, self.generator.mappings[0].weight[0][0].item())
+        if self.params.test:
+            logger.info(self.generator.mappings[0].weight[0][:10])
 
         return self.params.langnum * self.params.batch_size
 

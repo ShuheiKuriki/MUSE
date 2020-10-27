@@ -22,19 +22,18 @@ from src.evaluation import Evaluator
 
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 
+
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
-parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
+parser.add_argument("--seed", type=int, default=0, help="Initialization seed")
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
-parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
+parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
-# parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
-# parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 # mapping
@@ -74,6 +73,9 @@ parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum genera
 # parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
 # parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
+# test
+parser.add_argument("--test", type=bool_flag, default=True, help="do test or not")
+parser.add_argument("--test_type", type=str, default="dis", help="which should I test, discriminater(dis) or generater(gen)?")
 
 
 # parse parameters
@@ -86,8 +88,6 @@ assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
 assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
-# assert os.path.isfile(params.src_emb)
-# assert os.path.isfile(params.tgt_emb)
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
@@ -102,89 +102,19 @@ embs, generator, discriminator = build_model(params, True)
 trainer = Trainer(embs, generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
-
 # Learning loop for Adversarial Training
-if params.adversarial:
-    logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
-    # training loop
-    for n_epoch in range(params.n_epochs):
+stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
+# discriminator training
+if params.test_type == 'dis':
+    trainer.dis_step(stats)
+    stats_str = [('DIS_COSTS', 'Discriminator loss')]
+# mapping training (discriminator fooling)
+else:
+    trainer.gen_step(stats)
+    stats_str = [('MAP_COSTS', 'Mapping loss')]
 
-        logger.info('Starting adversarial training epoch %i...', n_epoch)
-        tic = time.time()
-        n_words_proc = 0
-        stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-
-        for n_iter in range(0, params.epoch_size, params.batch_size):
-
-
-            # discriminator training
-            for _ in range(params.dis_steps):
-                trainer.dis_step(stats)
-
-            # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step()
-
-            # log stats
-            if n_iter % 500 == 0:
-                stats_str = [('DIS_COSTS', 'Discriminator loss')]
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-                             for k, v in stats_str if len(stats[k]) > 0]
-                stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-                stats_log = ' - '.join(stats_log)
-                logger.info('%06i - %s', n_iter, stats_log)
-
-                # reset
-                tic = time.time()
-                n_words_proc = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
-
-        # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch})
-        evaluator.all_eval(to_log)
-        # evaluator.eval_dis(to_log)
-
-        # JSON log / save best model / end of epoch
-        logger.info("__log__:%s", json.dumps(to_log))
-        # trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of epoch %i.\n\n', n_epoch)
-
-        # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
-        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
-            logger.info('Learning rate < 1e-6. BREAK.')
-            break
-
-
-# Learning loop for Procrustes Iterative Refinement
-if params.n_refinement:
-    # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-    trainer.reload_best()
-
-    # training loop
-    for n_iter in range(params.n_refinement):
-
-        logger.info('Starting refinement iteration %i...', n_iter)
-
-        # build a dictionary from aligned embeddings
-        trainer.build_dictionary()
-
-        # apply the Procrustes solution
-        trainer.procrustes()
-
-        # embeddings evaluation
-        to_log = OrderedDict({'n_iter': n_iter})
-        evaluator.all_eval(to_log)
-
-        # JSON log / save best model / end of epoch
-        logger.info("__log__:%s", json.dumps(to_log))
-        trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of refinement iteration %i.\n\n', n_iter)
-
-
-# export embeddings
-# if params.export:
-    # trainer.reload_best()
-    # trainer.export()
+stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+stats_log = ' - '.join(stats_log)
+logger.info(stats_log)
