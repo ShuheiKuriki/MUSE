@@ -122,7 +122,7 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
-            print(self.discriminator(x.detach()))
+            logger.info(self.discriminator(x.detach()))
 
     def gen_step(self, stats):
         """
