@@ -41,8 +41,8 @@ class Trainer():
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
-            optim_fn, optim_params = get_optimizer(params.map_optimizer)
-            self.map_optimizer = optim_fn(generator.parameters(), **optim_params)
+            optim_fn, optim_params = get_optimizer(params.gen_optimizer)
+            self.gen_optimizer = optim_fn(generator.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
@@ -96,6 +96,8 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         dis_preds = self.discriminator(x.detach())
+        if self.params.test:
+            logger.info(self.discriminator(x.detach()))
         loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
         stats['DIS_COSTS'].append(loss.detach().item())

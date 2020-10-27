@@ -53,7 +53,7 @@ parser.add_argument("--dis_clip_weights", type=float, default=0, help="Clip disc
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
@@ -105,8 +105,7 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
 if params.test_type == 'dis':
-    for i in range(20):
-        trainer.dis_step(stats)
+    trainer.dis_step(stats)
     stats_str = [('DIS_COSTS', 'Discriminator loss')]
 # mapping training (discriminator fooling)
 else:
