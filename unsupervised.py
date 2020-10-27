@@ -93,6 +93,7 @@ assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 logger = initialize_exp(params)
+params.test = False
 params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
@@ -123,7 +124,7 @@ if params.adversarial:
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step()
+            n_words_proc += trainer.gen_step(stats)
 
             # log stats
             if n_iter % 500 == 0:
