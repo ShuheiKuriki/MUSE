@@ -62,8 +62,12 @@ class Trainer():
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
         assert mf <= min(len(self.src_dico), len(self.tgt_dico))
-        src_ids = torch.LongTensor(bs).random_(len(self.src_dico) if mf == 0 else mf)
-        tgt_ids = torch.LongTensor(bs).random_(len(self.tgt_dico) if mf == 0 else mf)
+        if self.params.test:
+            src_ids = torch.arange(1, bs+1, dtype=torch.int64)
+            tgt_ids = torch.arange(1, bs+1, dtype=torch.int64)
+        else:
+            src_ids = torch.LongTensor(bs).random_(len(self.src_dico) if mf == 0 else mf)
+            tgt_ids = torch.LongTensor(bs).random_(len(self.tgt_dico) if mf == 0 else mf)
         if self.params.cuda:
             src_ids = src_ids.cuda()
             tgt_ids = tgt_ids.cuda()
@@ -106,8 +110,10 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
+        if self.params.test:
+            print(self.discriminator(x.detach()))
 
-    def genarator_step(self, stats):
+    def generator_step(self, stats):
         """
         Fooling discriminator training step.
         """
@@ -118,10 +124,11 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x)
-        loss = F.binary_cross_entropy(preds, 1 - y)
+        dis_preds = self.discriminator(x)
+        loss = F.binary_cross_entropy(dis_preds, 1 - y)
         # loss = F.cross_entropy(preds, 1 - y)
         loss = self.params.dis_lambda * loss
+        stats['MAP_COSTS'].append(loss.detach().item())
 
         # check NaN
         if (loss != loss).detach().any():
@@ -132,9 +139,11 @@ class Trainer():
         self.map_optimizer.zero_grad()
         loss.backward()
         self.map_optimizer.step()
-        # print(1, self.generator.mapping.weight[0][0].item())
+        if self.params.test:
+            logger.info(self.generator.mapping.weight[0][:10])
         self.generator.orthogonalize()
-        # print(2, self.generator.mapping.weight[0][0].item())
+        if self.params.test:
+            logger.info(self.generator.mapping.weight[0][:10])
 
         return 2 * self.params.batch_size
 
