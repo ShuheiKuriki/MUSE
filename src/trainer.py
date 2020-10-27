@@ -40,7 +40,7 @@ class Trainer():
         self.params = params
 
         # optimizers
-        if hasattr(params, 'map_optimizer'):
+        if hasattr(params, 'gen_optimizer'):
             optim_fn, optim_params = get_optimizer(params.gen_optimizer)
             self.gen_optimizer = optim_fn(generator.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
@@ -139,9 +139,9 @@ class Trainer():
             sys.exit()
 
         # optim
-        self.map_optimizer.zero_grad()
+        self.gen_optimizer.zero_grad()
         loss.backward()
-        self.map_optimizer.step()
+        self.gen_optimizer.step()
         if self.params.test:
             logger.info(self.generator.mapping.weight[0][:10])
         self.generator.orthogonalize()
