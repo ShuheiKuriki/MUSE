@@ -124,7 +124,7 @@ if params.adversarial:
 
             # log stats
             if n_iter % 500 == 0:
-                stats_str = [('DIS_COSTS', 'Discriminator loss')]
+                stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
                              for k, v in stats_str if len(stats[k]) > 0]
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
