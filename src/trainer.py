@@ -20,9 +20,7 @@ from .utils import clip_parameters
 from .dico_builder import build_dictionary
 from .evaluation.word_translation import DIC_EVAL_PATH, load_identical_char_dico, load_dictionary
 
-
 logger = getLogger()
-
 
 class Trainer():
     """muse trainer"""
@@ -96,7 +94,7 @@ class Trainer():
         dis_preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.discriminator.layers[1].weight[0][:10])
             logger.info(self.generator.mapping.weight[0][:10])
         loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
@@ -114,7 +112,8 @@ class Trainer():
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
             logger.info('after_dis')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.discriminator.layers[1].weight[0][:10])
+            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             logger.info(self.generator.mapping.weight[0][:10])
 
     def generator_step(self, stats):
@@ -129,10 +128,10 @@ class Trainer():
         x, y = self.get_dis_xy()
         if self.params.test:
             logger.info('gen_start')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.discriminator.layers[1].weight[0][:10])
             logger.info(self.generator.mapping.weight[0][:10])
         dis_preds = self.discriminator(x)
-        loss = F.binary_cross_entropy(dis_preds, 1 - y)
+        loss = F.binary_cross_entropy(dis_preds, 1-y)
         # loss = F.cross_entropy(preds, 1 - y)
         loss = self.params.dis_lambda * loss
         stats['MAP_COSTS'].append(loss.detach().item())
@@ -148,13 +147,17 @@ class Trainer():
         self.gen_optimizer.step()
         if self.params.test:
             logger.info('after_gen')
+            x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
+            logger.info(self.generator.mapping.weight.grad[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
             logger.info('orthogonalized')
+            x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
+            logger.info(self.generator.mapping.weight.grad[0][:10])
 
         return 2 * self.params.batch_size
 
