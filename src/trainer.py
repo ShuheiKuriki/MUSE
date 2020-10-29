@@ -106,8 +106,8 @@ class Trainer():
         preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(preds[:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
         # loss = torch.mean(torch.sum(-y*preds, dim=1))
         # loss = F.cross_entropy(preds, y)
         loss = F.binary_cross_entropy(preds, y)
@@ -127,8 +127,9 @@ class Trainer():
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
             logger.info('after_dis')
-            logger.info(self.generator.mappings[0].weight[0][:10])
             logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
 
     def gen_step(self, stats):
         """
@@ -144,6 +145,7 @@ class Trainer():
         preds = self.discriminator(x)
         if self.params.test:
             logger.info('gen_start')
+            logger.info(preds[:10])
             logger.info(self.generator.mappings[0].weight[0][:10])
         loss = 0
         # print(y)
@@ -164,13 +166,16 @@ class Trainer():
         self.gen_optimizer.step()
         if self.params.test:
             logger.info('after_gen')
-            logger.info(self.generator.mappings[0].weight[0][:10])
+            x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.generator.mappings[0].weight.grad[0][:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
             logger.info('orthogonalized')
-            logger.info(self.generator.mappings[0].weight[0][:10])
+            x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
 
         return self.params.langnum * self.params.batch_size
 
