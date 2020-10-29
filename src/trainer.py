@@ -94,7 +94,7 @@ class Trainer():
         dis_preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(dis_preds[:10])
             logger.info(self.generator.mapping.weight[0][:10])
         loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
@@ -126,11 +126,11 @@ class Trainer():
         self.discriminator.eval()
         # loss
         x, y = self.get_dis_xy()
+        dis_preds = self.discriminator(x)
         if self.params.test:
             logger.info('gen_start')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(dis_preds[:10])
             logger.info(self.generator.mapping.weight[0][:10])
-        dis_preds = self.discriminator(x)
         loss = F.binary_cross_entropy(dis_preds, 1-y)
         # loss = F.cross_entropy(preds, 1 - y)
         loss = self.params.dis_lambda * loss
