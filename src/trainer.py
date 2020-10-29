@@ -94,7 +94,7 @@ class Trainer():
         dis_preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.discriminator.layers[1].weight[0][:10])
+            logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
         loss = F.binary_cross_entropy(dis_preds, y)
         # loss = F.cross_entropy(preds, y)
@@ -112,7 +112,7 @@ class Trainer():
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
         if self.params.test:
             logger.info('after_dis')
-            logger.info(self.discriminator.layers[1].weight[0][:10])
+            logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             logger.info(self.generator.mapping.weight[0][:10])
 
@@ -128,7 +128,7 @@ class Trainer():
         x, y = self.get_dis_xy()
         if self.params.test:
             logger.info('gen_start')
-            logger.info(self.discriminator.layers[1].weight[0][:10])
+            logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
         dis_preds = self.discriminator(x)
         loss = F.binary_cross_entropy(dis_preds, 1-y)
@@ -149,15 +149,14 @@ class Trainer():
             logger.info('after_gen')
             x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
-            logger.info(self.generator.mapping.weight[0][:10])
             logger.info(self.generator.mapping.weight.grad[0][:10])
+            logger.info(self.generator.mapping.weight[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
             logger.info('orthogonalized')
             x, y = self.get_dis_xy()
             logger.info(self.discriminator(x.detach())[:10])
             logger.info(self.generator.mapping.weight[0][:10])
-            logger.info(self.generator.mapping.weight.grad[0][:10])
 
         return 2 * self.params.batch_size
 
