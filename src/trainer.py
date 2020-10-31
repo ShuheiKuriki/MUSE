@@ -256,7 +256,6 @@ class Trainer():
         if new_lr < old_lr:
             logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
             self.gen_optimizer.param_groups[0]['lr'] = new_lr
-
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
             if to_log[metric] < self.best_valid_metric:
                 logger.info("Validation metric is smaller than the best: %.5f vs %.5f"
@@ -270,21 +269,22 @@ class Trainer():
                                 , old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
 
-    # def save_best(self, to_log, metric):
-    #     """
-    #     Save the best model for the given validation metric.
-    #     """
-    #     # best generator for the given validation criterion
-    #     if to_log[metric] > self.best_valid_metric:
-    #         # new best generator
-    #         self.best_valid_metric = to_log[metric]
-    #         logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
-    #         # save the generator
+    def save_best(self, to_log, metric):
+        """
+        Save the best model for the given validation metric.
+        """
+        # best generator for the given validation criterion
+        if to_log[metric] > self.best_valid_metric:
+            # new best generator
+            self.best_valid_metric = to_log[metric]
+            logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
+            # save the generator
 
-    #         W = self.generator.weight.detach().cpu().numpy()
-    #         path = os.path.join(self.params.exp_path, 'best_generator.pth')
-    #         logger.info('* Saving the generator to %s ...', path)
-    #         torch.save(W, path)
+            for i in range(self.params.langnum-1):
+                W = self.generator.mappings[i].weight.detach().cpu().numpy()
+                path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
+                logger.info('* Saving the generator to %s ...', path)
+                torch.save(W, path)
 
     # def reload_best(self):
     #     """

@@ -78,23 +78,16 @@ class Evaluator:
             to_log['tgt_analogy_monolingual_scores'] = tgt_analogy_monolingual_scores
             to_log.update({'tgt_' + k: v for k, v in tgt_analogy_scores.items()})
 
-    def crosslingual_wordsim(self, i, j, to_log):
+    def crosslingual_wordsim(self, i, to_log):
         """
         Evaluation on cross-lingual word similarity.
         """
-        if i == self.params.langnum-1:
-            src_emb = self.embs[i].weight.detach().cpu().numpy()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach().cpu().numpy()
-        if j == self.params.langnum-1:
-            tgt_emb = self.embs[j].weight.detach().cpu().numpy()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach().cpu().numpy()
-        # tgt_emb = self.src_mapping(self.tgt_emb.weight).detach().cpu().numpy()
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach().cpu().numpy()
+        tgt_emb = self.embs[-1].weight.detach().cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
             self.dicos[i].lang, self.dicos[i].word2id, src_emb,
-            self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
+            self.dicos[-1].lang, self.dicos[-1].word2id, tgt_emb
         )
         if src_tgt_ws_scores is None:
             return
@@ -103,33 +96,29 @@ class Evaluator:
         to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         to_log.update({'src_tgt_' + k: v for k, v in src_tgt_ws_scores.items()})
 
-    def word_translation(self, i, j, to_log):
+    def word_translation(self, i, to_log):
         """
         Evaluation on word translation.
         """
         # mapped word embeddings
-        if i == self.params.langnum-1:
-            src_emb = self.embs[i].weight.detach()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.params.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.embs[-1].weight.detach()
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(
-                self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval
-                )
+                self.dicos[i].lang, self.dicos[i].word2id, src_emb, 
+                self.dicos[-1].lang, self.dicos[-1].word2id, tgt_emb, 
+                method=method, dico_eval=self.params.dico_eval
+            )
             to_log.update([('%s-%s' % (k, method), v) for k, v in results])
 
-    def sent_translation(self, i, j, to_log):
+    def sent_translation(self, i, to_log):
         """
         Evaluation on sentence translation.
         Only available on Europarl, for en - {de, es, fr, it} language pairs.
         """
         lg1 = self.dicos[i].lang
-        lg2 = self.dicos[j].lang
+        lg2 = self.dicos[-1].lang
 
         # parameters
         n_keys = 200000
@@ -147,14 +136,8 @@ class Evaluator:
             return
 
         # mapped word embeddings
-        if i == self.params.langnum-1:
-            src_emb = self.embs[i].weight.detach()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.params.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.embs[-1].weight.detach()
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
 
@@ -164,7 +147,7 @@ class Evaluator:
             results = get_sent_translation_accuracy(
                 self.europarl_data,
                 self.dicos[i].lang, self.dicos[i].word2id, src_emb,
-                self.dicos[j].lang, self.dicos[j].word2id, tgt_emb,
+                self.dicos[-1].lang, self.dicos[-1].word2id, tgt_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )
@@ -174,27 +157,25 @@ class Evaluator:
             results = get_sent_translation_accuracy(
                 self.europarl_data,
                 self.dicos[i].lang, self.dicos[i].word2id, tgt_emb,
-                self.dicos[j].lang, self.dicos[j].word2id, src_emb,
+                self.dicos[-1].lang, self.dicos[-1].word2id, src_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )
             to_log.update([('src_to_tgt_%s-%s' % (k, method), v) for k, v in results])
 
-    def dist_mean_cosine(self, i, j, to_log):
+    def dist_mean_cosine(self, i, to_log):
         """
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
+        
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach()
         else:
             src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.params.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
-        src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
+        tgt_emb = self.embs[-1].weight.detach()
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
+        src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
 
         # build dictionary
         for dico_method in ['nn', 'csls_knn_10']:
@@ -218,24 +199,27 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
+            if i==0:
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
+            else:
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine
 
     def all_eval(self, to_log):
         """
         Run all evaluations.
         """
         self.generator.eval()
-        for i in range(self.params.langnum):
+        for i in range(self.params.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
-            self.monolingual_wordsim(i, to_log)
-            for j in range(self.params.langnum):
-                if i == j:
-                    continue
-                logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
-                self.crosslingual_wordsim(i, j, to_log)
-                self.word_translation(i, j, to_log)
-                self.sent_translation(i, j, to_log)
-                self.dist_mean_cosine(i, j, to_log)
+            # self.monolingual_wordsim(i, to_log)
+            # for j in range(self.params.langnum):
+                # if i == j:
+                    # continue
+                # logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
+            self.crosslingual_wordsim(i, to_log)
+            self.word_translation(i, to_log)
+            self.sent_translation(i, to_log)
+            self.dist_mean_cosine(i, to_log)
 
     def eval_dis(self, to_log):
         """
@@ -247,25 +231,26 @@ class Evaluator:
         pred_ = [0]*langnum
         self.discriminator.eval()
 
-        with torch.no_grad():
-            for i in range(langnum):
-                for j in range(0, self.embs[i].num_embeddings, bs):
-                    emb = self.embs[i].weight[j:j + bs].detach()
-                    if i < langnum-1:
-                        preds = self.discriminator(self.generator[i](emb).detach())
-                    else:
-                        preds = self.discriminator(emb)
+        for i in range(langnum):
+            for j in range(0, self.embs[i].num_embeddings, bs):
+                emb = self.embs[i].weight[j:j + bs].detach()
+                if i < langnum-1:
+                    preds = self.discriminator(self.generator.mappings[i](emb).detach())
+                else:
+                    preds = self.discriminator(emb)
                 preds_[i].extend(preds.detach().cpu().tolist())
-                pred_[i] = np.mean([x[i] for x in preds_[i]])
-                # print(preds_[i][0])
+            pred_[i] = np.mean(preds_[i])
+            # pred_[i] = np.mean([x[i] for x in preds_[i]])
+            # print(preds_[i][0])
 
-                logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
+            logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
 
         accus = [0]*langnum
         cnt = 0
         total = sum([self.embs[i].num_embeddings for i in range(langnum)])
         for i in range(langnum):
-            accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
+            accus[i] = np.mean([x >= 0.5 for x in preds_[i]])
+            # accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
             cnt += accus[i] * self.embs[i].num_embeddings
             logger.info("Discriminator %s accuracy: %.5f", self.params.langs[i], accus[i])
         dis_accu = cnt/total
