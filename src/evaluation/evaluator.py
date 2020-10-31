@@ -249,7 +249,7 @@ class Evaluator:
         cnt = 0
         total = sum([self.embs[i].num_embeddings for i in range(langnum)])
         for i in range(langnum):
-            accus[i] = np.mean([x >= 0.5 for x in preds_[i]])
+            accus[i] = np.mean([x < 0.5 for x in preds_[i]])
             # accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
             cnt += accus[i] * self.embs[i].num_embeddings
             logger.info("Discriminator %s accuracy: %.5f", self.params.langs[i], accus[i])
