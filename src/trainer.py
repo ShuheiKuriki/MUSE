@@ -110,7 +110,7 @@ class Trainer():
         preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
-            logger.info(preds[:10])
+            logger.info(torch.exp(preds[:10]))
             logger.info(self.generator.mappings[0].weight[0][:10])
 
         # cross_entropyの場合
@@ -118,10 +118,9 @@ class Trainer():
 
         # binary_cross_entropyの場合
         # loss = F.binary_cross_entropy(preds, y)
-        
+
         loss *= self.params.dis_lambda
         # print(loss)
-        stats['DIS_COSTS'].append(loss.detach().item())
 
         # check NaN
         if (loss != loss).detach().any():
@@ -133,9 +132,13 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
+
+        new_preds = self.discriminator(x.detach())
+        new_loss = torch.mean(torch.sum(-y*new_preds, dim=1))
+        stats['DIS_COSTS'].append(new_loss.detach().item())
         if self.params.test:
             logger.info('after_dis')
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(torch.exp(new_preds[:10]))
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             logger.info(self.generator.mappings[0].weight[0][:10])
 
@@ -153,7 +156,7 @@ class Trainer():
         preds = self.discriminator(x)
         if self.params.test:
             logger.info('gen_start')
-            logger.info(preds[:10])
+            logger.info(torch.exp(preds[:10]))
             logger.info(self.generator.mappings[0].weight[0][:10])
         loss = 0
         # print(y)
@@ -170,7 +173,6 @@ class Trainer():
         loss *= self.params.dis_lambda
 
         # print(loss)
-        stats['MAP_COSTS'].append(loss.detach().item())
 
         # check NaN
         if (loss != loss).detach().any():
@@ -181,17 +183,21 @@ class Trainer():
         self.gen_optimizer.zero_grad()
         loss.backward()
         self.gen_optimizer.step()
+
+        new_x, new_y = self.get_dis_xy()
+        new_preds = self.discriminator(new_x.detach())
+        new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
+        stats['MAP_COSTS'].append(new_loss.detach().item())
         if self.params.test:
             logger.info('after_gen')
-            x, y = self.get_dis_xy()
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(torch.exp(new_preds[:10]))
             logger.info(self.generator.mappings[0].weight.grad[0][:10])
             logger.info(self.generator.mappings[0].weight[0][:10])
         self.generator.orthogonalize()
         if self.params.test:
             logger.info('orthogonalized')
             x, y = self.get_dis_xy()
-            logger.info(self.discriminator(x.detach())[:10])
+            logger.info(torch.exp(self.discriminator(x.detach())[:10]))
             logger.info(self.generator.mappings[0].weight[0][:10])
 
         return self.params.langnum * self.params.batch_size
