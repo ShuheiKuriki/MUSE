@@ -133,6 +133,7 @@ class Trainer():
         self.dis_optimizer.step()
         clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
+        self.discriminator.eval()
         new_preds = self.discriminator(x.detach())
         new_loss = torch.mean(torch.sum(-y*new_preds, dim=1))
         stats['DIS_COSTS'].append(new_loss.detach().item())
@@ -141,6 +142,7 @@ class Trainer():
             logger.info(torch.exp(new_preds[:10]))
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             logger.info(self.generator.mappings[0].weight[0][:10])
+            logger.info('Discriminator loss %.4f', new_loss)
 
     def gen_step(self, stats):
         """
@@ -193,6 +195,7 @@ class Trainer():
             logger.info(torch.exp(new_preds[:10]))
             logger.info(self.generator.mappings[0].weight.grad[0][:10])
             logger.info(self.generator.mappings[0].weight[0][:10])
+            logger.info('Mapping loss %.4f', new_loss)
         self.generator.orthogonalize()
         if self.params.test:
             logger.info('orthogonalized')

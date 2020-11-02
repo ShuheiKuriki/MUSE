@@ -27,6 +27,7 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=0, help="Initialization seed")
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
+parser.add_argument("--test_epochs", type=int, default=5, help="the number of test epochs")
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
 parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
@@ -101,7 +102,7 @@ logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 # discriminator training
 stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-for _ in range(5):
+for _ in range(params.test_epochs):
     trainer.dis_step(stats)
 # mapping training (discriminator fooling)
     trainer.gen_step(stats)
