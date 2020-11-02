@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-
+# python test.py --exp_id n_class_drop0.1_seed0 --dis_input_dropout 0.1 --seed 0
 import os
 import time
 import json

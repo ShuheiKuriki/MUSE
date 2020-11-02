@@ -238,9 +238,9 @@ class Evaluator:
                     preds = self.discriminator(self.generator.mappings[i](emb).detach())
                 else:
                     preds = self.discriminator(emb)
-                preds_[i].extend(preds.detach().cpu().tolist())
-            pred_[i] = np.mean(preds_[i])
-            # pred_[i] = np.mean([x[i] for x in preds_[i]])
+                preds_[i].extend(torch.exp(preds).detach().cpu().tolist())
+            # pred_[i] = np.mean(preds_[i])
+            pred_[i] = np.mean([x[i] for x in preds_[i]])
             # print(preds_[i][0])
 
             logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
@@ -249,12 +249,12 @@ class Evaluator:
         cnt = 0
         total = sum([self.embs[i].num_embeddings for i in range(langnum)])
         for i in range(langnum):
-            accus[i] = np.mean([x < 0.5 for x in preds_[i]])
-            # accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
+            # accus[i] = np.mean([x < 0.5 for x in preds_[i]])
+            accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
             cnt += accus[i] * self.embs[i].num_embeddings
             logger.info("Discriminator %s accuracy: %.5f", self.params.langs[i], accus[i])
         dis_accu = cnt/total
-        logger.info("Discriminator global accuracy: %.5f", accus[i])
+        logger.info("Discriminator global accuracy: %.5f", dis_accu)
 
         to_log['dis_accu'] = dis_accu
         # to_log['dis_src_pred'] = pred
