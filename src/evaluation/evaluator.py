@@ -105,11 +105,7 @@ class Evaluator:
         tgt_emb = self.embs[-1].weight.detach()
 
         for method in ['nn', 'csls_knn_10']:
-            results = get_word_translation_accuracy(
-                self.dicos[i].lang, self.dicos[i].word2id, src_emb, 
-                self.dicos[-1].lang, self.dicos[-1].word2id, tgt_emb, 
-                method=method, dico_eval=self.params.dico_eval
-            )
+            results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[-1].lang, self.dicos[-1].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
             to_log.update([('%s-%s' % (k, method), v) for k, v in results])
 
     def sent_translation(self, i, to_log):
@@ -168,7 +164,7 @@ class Evaluator:
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        
+
         if i == self.params.langnum-1:
             src_emb = self.embs[i].weight.detach()
         else:
@@ -199,7 +195,7 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if i==0:
+            if i == 0:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
             else:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine
@@ -219,7 +215,7 @@ class Evaluator:
             self.crosslingual_wordsim(i, to_log)
             self.word_translation(i, to_log)
             self.sent_translation(i, to_log)
-            self.dist_mean_cosine(i, to_log)
+            # self.dist_mean_cosine(i, to_log)
 
     def eval_dis(self, to_log):
         """

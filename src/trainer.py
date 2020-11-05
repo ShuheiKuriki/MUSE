@@ -49,6 +49,7 @@ class Trainer():
             assert discriminator is None
 
         # best validation score
+        self.prev_metric = -1e12
         self.best_valid_metric = -1e12
 
         self.decrease_lr = False
@@ -170,7 +171,8 @@ class Trainer():
         # loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
 
         # cross_entropy -F(y)の場合
-        loss = -torch.mean(torch.sum(-y*preds, dim=1))
+        # loss = -torch.mean(torch.sum(-y*preds, dim=1))
+        loss = torch.mean(torch.sum(-(1/self.params.langnum-y)*preds, dim=1))
 
         loss *= self.params.dis_lambda
 
@@ -283,17 +285,17 @@ class Trainer():
             logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
             self.gen_optimizer.param_groups[0]['lr'] = new_lr
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
-            if to_log[metric] < self.best_valid_metric:
-                logger.info("Validation metric is smaller than the best: %.5f vs %.5f"
-                            , to_log[metric], self.best_valid_metric)
+            if to_log[metric] < self.prev_metric:
+                logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
-                if self.decrease_lr:
-                    old_lr = self.gen_optimizer.param_groups[0]['lr']
-                    self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                    logger.info("Shrinking the learning rate: %.5f -> %.5f"
-                                , old_lr, self.gen_optimizer.param_groups[0]['lr'])
+                old_lr = self.gen_optimizer.param_groups[0]['lr']
+                self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
+            else:
+                logger.info("The validation metric is getting better")
+            self.prev_metric = to_log[metric]
 
     def save_best(self, to_log, metric):
         """

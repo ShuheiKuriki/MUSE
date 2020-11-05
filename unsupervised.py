@@ -20,7 +20,7 @@ from src.trainer import Trainer
 from src.evaluation import Evaluator
 
 
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
+VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
@@ -58,7 +58,7 @@ parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
-parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
+parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
@@ -109,6 +109,7 @@ if params.adversarial:
     logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
     # training loop
+    
     for n_epoch in range(params.n_epochs):
 
         logger.info('Starting adversarial training epoch %i...', n_epoch)
@@ -130,7 +131,7 @@ if params.adversarial:
             if n_iter % 500 == 0:
                 stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-                             for k, v in stats_str if len(stats[k]) > 0]
+                             for k, v in stats_str if len(stats[k])]
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
@@ -153,11 +154,18 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
+        if n_epoch >= 5:
+            if trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
+                logger.info('We got the best metric.')
+                break
+            if trainer.best_valid_metric < 0.1:
+                logger.info('Learning failed')
+                break
         if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
             logger.info('Learning rate < 1e-6. BREAK.')
             break
 
-
+logger.info('The best metric is %.4f', trainer.best_valid_metric)
 # Learning loop for Procrustes Iterative Refinement
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
