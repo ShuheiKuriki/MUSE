@@ -45,11 +45,9 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_steps", type=int, default=5, help="Discriminator steps")
-parser.add_argument("--dis_lambda", type=float, default=1, help="Discriminator loss feedback coefficient")
+parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
-parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
-parser.add_argument("--dis_clip_weights", type=float, default=0, help="Clip discriminator weights (0 to disable)")
+parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
@@ -57,9 +55,11 @@ parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations 
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
+parser.add_argument("--entropy_lambda", type=float, default=2, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
+parser.add_argument("--clip_grad", type=float, default=0.5, help="Clip discriminator weights (0 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -84,7 +84,8 @@ assert not params.cuda or torch.cuda.is_available()
 assert 0 <= params.dis_dropout < 1
 assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
-assert params.dis_lambda > 0 and params.dis_steps > 0
+assert 0 < params.dis_sampling <= 1
+# assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
 # assert os.path.isfile(params.src_emb)
 # assert os.path.isfile(params.tgt_emb)
@@ -109,7 +110,6 @@ if params.adversarial:
     logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
     # training loop
-    
     for n_epoch in range(params.n_epochs):
 
         logger.info('Starting adversarial training epoch %i...', n_epoch)
@@ -119,9 +119,8 @@ if params.adversarial:
 
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
-
             # discriminator training
-            for _ in range(params.dis_steps):
+            if np.random.rand() <= params.dis_sampling:
                 trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
@@ -154,7 +153,7 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        if n_epoch >= 5:
+        if n_epoch >= 6:
             if trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
                 logger.info('We got the best metric.')
                 break

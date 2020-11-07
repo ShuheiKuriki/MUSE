@@ -92,7 +92,7 @@ class Trainer():
 
         # cross_entropyの場合
         y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        y[:, :] = self.params.dis_smooth/(langnum-1)
+        # y[:, :] = self.params.dis_smooth/(langnum-1)
         for i in range(langnum):
             y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
 
@@ -120,7 +120,7 @@ class Trainer():
         # binary_cross_entropyの場合
         # loss = F.binary_cross_entropy(preds, y)
 
-        loss *= self.params.dis_lambda
+        # loss *= self.params.dis_lambda
         # print(loss)
 
         # check NaN
@@ -130,9 +130,10 @@ class Trainer():
 
         # optim
         self.dis_optimizer.zero_grad()
+        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         loss.backward()
         self.dis_optimizer.step()
-        clip_parameters(self.discriminator, self.params.dis_clip_weights)
+        # clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
         self.discriminator.eval()
         new_preds = self.discriminator(x.detach())
@@ -149,8 +150,8 @@ class Trainer():
         """
         Fooling discriminator training step.
         """
-        if self.params.dis_lambda == 0:
-            return 0
+        # if self.params.dis_lambda == 0:
+            # return 0
 
         self.discriminator.eval()
 
@@ -172,11 +173,7 @@ class Trainer():
 
         # cross_entropy -F(y)の場合
         # loss = -torch.mean(torch.sum(-y*preds, dim=1))
-        loss = torch.mean(torch.sum(-(1/self.params.langnum-y)*preds, dim=1))
-
-        loss *= self.params.dis_lambda
-
-        # print(loss)
+        loss = torch.mean(torch.sum(-(self.params.entropy_lambda/self.params.langnum-y)*preds, dim=1))
 
         # check NaN
         if (loss != loss).detach().any():
@@ -186,6 +183,7 @@ class Trainer():
         # optim
         self.gen_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         self.gen_optimizer.step()
 
         new_x, new_y = self.get_dis_xy()
