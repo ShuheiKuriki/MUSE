@@ -54,7 +54,6 @@ def initialize_exp(params):
         torch.manual_seed(params.seed)
         if params.cuda:
             torch.cuda.manual_seed_all(params.seed)
-
     # dump parameters
     params.exp_path = get_exp_path(params)
     with io.open(os.path.join(params.exp_path, 'params.pkl'), 'wb') as f:
@@ -65,6 +64,9 @@ def initialize_exp(params):
     logger.info('============ Initialized logger ============')
     logger.info('\n'.join('%s: %s' % (k, str(v)) for k, v in sorted(dict(vars(params)).items())))
     logger.info('The experiment will be stored in %s', params.exp_path)
+    if params.cuda:
+        torch.cuda.set_device(params.device)
+    logger.info('current device is %s', str(torch.cuda.current_device()))
     return logger
 
 
@@ -103,7 +105,7 @@ def bow_idf(sentences, word_vec, idf_dict=None):
     for sent in sentences:
         sent = set(sent)
         list_words = [w for w in sent if w in word_vec and w in idf_dict]
-        if len(list_words) > 0:
+        if list_words.empty():
             sentvec = [word_vec[w] * idf_dict[w] for w in list_words]
             sentvec = sentvec / np.sum([idf_dict[w] for w in list_words])
         else:

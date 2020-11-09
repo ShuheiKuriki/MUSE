@@ -20,7 +20,7 @@ from src.trainer import Trainer
 from src.evaluation import Evaluator
 
 
-VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
+VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
@@ -30,6 +30,7 @@ parser.add_argument("--exp_path", type=str, default="", help="Where to store exp
 parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
+parser.add_argument("--device", type=int, default=0, help="select cuda device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -48,6 +49,7 @@ parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discri
 parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
+parser.add_argument("--clip_grad", type=float, default=1, help="Clip discriminator weights (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
@@ -59,7 +61,6 @@ parser.add_argument("--entropy_lambda", type=float, default=2, help="loss entrop
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-parser.add_argument("--clip_grad", type=float, default=0.5, help="Clip discriminator weights (0 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -157,7 +158,8 @@ if params.adversarial:
             if trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
                 logger.info('We got the best metric.')
                 break
-            if trainer.best_valid_metric < 0.1:
+            p = params.langnum
+            if trainer.best_valid_metric < 0.17 * p * (p-1):
                 logger.info('Learning failed')
                 break
         if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:

@@ -183,7 +183,7 @@ class Trainer():
         # optim
         self.gen_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
+        torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         self.gen_optimizer.step()
 
         new_x, new_y = self.get_dis_xy()
@@ -291,6 +291,7 @@ class Trainer():
                 self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
                 logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
+                self.params.epoch_size //= 2
             else:
                 logger.info("The validation metric is getting better")
             self.prev_metric = to_log[metric]
