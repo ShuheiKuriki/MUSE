@@ -1,7 +1,13 @@
-for entropy in .2 .3
+lgs="en es fr de"
+for lg1 in $lgs
 do
-  for sample in .3
+  for lg2 in $lgs
   do
-    python unsupervised.py --exp_id entropy${entropy}_sample${sample} --dis_sampling $sample --n_epochs 15 --epoch_size 1000000 --exp_name search --entropy_lambda $entropy --langs es_it_en --exp_name es_it_en --device 3
+    for lg3 in $lgs
+    do
+      if [ $lg1 != $lg2 ] && [ $lg1 != $lg3 ] && [ $lg2 != $lg3 ]; then
+        python unsupervised.py --exp_id ${lg1}-${lg2}-${lg3} --dis_sampling 0.3 --n_epochs 15 --epoch_size 1000000 --entropy_lambda 0.1 --langs ${lg1}_${lg2}_${lg3} --exp_name three_langs --device 3 &
+      fi
+    done
   done
 done
