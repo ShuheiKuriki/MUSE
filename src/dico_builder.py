@@ -133,7 +133,7 @@ def get_candidates(emb1, emb2, params):
     # confidence threshold
     if params.dico_threshold > 0:
         mask = diff > params.dico_threshold
-        logger.info("Selected %i / %i pairs above the confidence threshold." % (mask.sum(), diff.size(0)))
+        logger.info("Selected %i / %i pairs above the confidence threshold.", mask.sum(), diff.size(0))
         mask = mask.unsqueeze(1).expand_as(all_pairs).clone()
         all_pairs = all_pairs.masked_select(mask).view(-1, 2)
 
@@ -174,5 +174,5 @@ def build_dictionary(src_emb, tgt_emb, params, s2t_candidates=None, t2s_candidat
                 return None
         dico = torch.LongTensor(list([[int(a), int(b)] for (a, b) in final_pairs]))
 
-    logger.info('New train dictionary of %i pairs.' % dico.size(0))
+    logger.info('New train dictionary of %i pairs.', dico.size(0))
     return dico.cuda() if params.cuda else dico
