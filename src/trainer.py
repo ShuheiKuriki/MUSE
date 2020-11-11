@@ -49,6 +49,7 @@ class Trainer():
             assert discriminator is None
 
         # best validation score
+        self.prev_metric = -1e12
         self.best_valid_metric = -1e12
 
         self.decrease_lr = False
@@ -64,29 +65,37 @@ class Trainer():
         assert mf <= min(map(len, self.dicos))
         ids = [0]*langnum
         for i in range(langnum):
-            ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
+            if self.params.test:
+                ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
+            else:
+                ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
             if self.params.cuda:
                 ids[i] = ids[i].cuda()
 
         # get word embeddings
-        # print(1, self.embs[0](torch.LongTensor([0])).detach()[0][0].item())
-        # print(1, self.embs[1](torch.LongTensor([0])).detach()[0][0].item())
         embs = [0]*langnum
         for i in range(langnum):
             embs[i] = self.embs[i](ids[i]).detach()
         for i in range(langnum-1):
             embs[i] = self.generator(embs[i], i)
+        # if self.params.test:
+            # logger.info(self.embs[0].weight.detach()[0][:10])
+            # logger.info(self.embs[1].weight.detach()[0][:10])
 
         # input / target
         x = torch.cat(embs, 0)
-        # y = torch.zeros(langnum * bs, dtype=torch.int64)
-        # y = torch.zeros((langnum * bs, langnum), dtype=torch.int64)
-        y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        y[:, :] = self.params.dis_smooth/(langnum-1)
+
+        # binary_cross_entropyの場合
+        # y = torch.zeros(langnum * bs, dtype=torch.float32)
         # for i in range(langnum):
-            # y[i*bs:(i+1)*bs] = i#1-i+self.params.dis_smooth*(2*i-1)
+            # y[i*bs:(i+1)*bs] = 1-i+self.params.dis_smooth*(2*i-1)
+
+        # cross_entropyの場合
+        y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
+        # y[:, :] = self.params.dis_smooth/(langnum-1)
         for i in range(langnum):
             y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
+
         y = y.cuda() if self.params.cuda else y
 
         return x, y
@@ -96,17 +105,23 @@ class Trainer():
         Train the discriminator.
         """
         self.discriminator.train()
-        self.generator.eval()
 
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
+        if self.params.test:
+            logger.info('dis_start')
+            logger.info(torch.exp(preds[:10]))
+            logger.info(self.generator.mappings[0].weight[0][:10])
+
+        # cross_entropyの場合
         loss = torch.mean(torch.sum(-y*preds, dim=1))
-        loss *= self.params.dis_lambda
-        # loss = F.cross_entropy(preds, y)
+
+        # binary_cross_entropyの場合
         # loss = F.binary_cross_entropy(preds, y)
+
+        # loss *= self.params.dis_lambda
         # print(loss)
-        stats['DIS_COSTS'].append(loss.detach().item())
 
         # check NaN
         if (loss != loss).detach().any():
@@ -115,28 +130,50 @@ class Trainer():
 
         # optim
         self.dis_optimizer.zero_grad()
+        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         loss.backward()
         self.dis_optimizer.step()
-        clip_parameters(self.discriminator, self.params.dis_clip_weights)
+        # clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
-    def gen_step(self):
+        self.discriminator.eval()
+        new_preds = self.discriminator(x.detach())
+        new_loss = torch.mean(torch.sum(-y*new_preds, dim=1))
+        stats['DIS_COSTS'].append(new_loss.detach().item())
+        if self.params.test:
+            logger.info('after_dis')
+            logger.info(torch.exp(new_preds[:10]))
+            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
+            logger.info('Discriminator loss %.4f', new_loss)
+
+    def gen_step(self, stats):
         """
         Fooling discriminator training step.
         """
-        if self.params.dis_lambda == 0:
-            return 0
+        # if self.params.dis_lambda == 0:
+            # return 0
 
         self.discriminator.eval()
 
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x)
+        if self.params.test:
+            logger.info('gen_start')
+            logger.info(torch.exp(preds[:10]))
+            logger.info(self.generator.mappings[0].weight[0][:10])
         loss = 0
         # print(y)
-        loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
-        loss *= self.params.dis_lambda# * F.cross_entropy(preds, 1-y)
+
+        # binary_cross_entropy F(1-y)の場合
         # loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
-        # print(loss)
+
+        # cross_entropy F(1-y)の場合
+        # loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
+
+        # cross_entropy -F(y)の場合
+        # loss = -torch.mean(torch.sum(-y*preds, dim=1))
+        loss = torch.mean(torch.sum(-(self.params.entropy_lambda/self.params.langnum-y)*preds, dim=1))
 
         # check NaN
         if (loss != loss).detach().any():
@@ -146,10 +183,25 @@ class Trainer():
         # optim
         self.gen_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         self.gen_optimizer.step()
-        # print(1, self.generator.mappings[0].weight[0][0].item())
+
+        new_x, new_y = self.get_dis_xy()
+        new_preds = self.discriminator(new_x.detach())
+        new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
+        stats['MAP_COSTS'].append(new_loss.detach().item())
+        if self.params.test:
+            logger.info('after_gen')
+            logger.info(torch.exp(new_preds[:10]))
+            logger.info(self.generator.mappings[0].weight.grad[0][:10])
+            logger.info(self.generator.mappings[0].weight[0][:10])
+            logger.info('Mapping loss %.4f', new_loss)
         self.generator.orthogonalize()
-        # print(2, self.generator.mappings[0].weight[0][0].item())
+        if self.params.test:
+            logger.info('orthogonalized')
+            x, y = self.get_dis_xy()
+            logger.info(torch.exp(self.discriminator(x.detach())[:10]))
+            logger.info(self.generator.mappings[0].weight[0][:10])
 
         return self.params.langnum * self.params.batch_size
 
@@ -230,35 +282,36 @@ class Trainer():
         if new_lr < old_lr:
             logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
             self.gen_optimizer.param_groups[0]['lr'] = new_lr
-
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
-            if to_log[metric] < self.best_valid_metric:
-                logger.info("Validation metric is smaller than the best: %.5f vs %.5f"
-                            , to_log[metric], self.best_valid_metric)
+            if to_log[metric] < self.prev_metric:
+                logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
-                if self.decrease_lr:
-                    old_lr = self.gen_optimizer.param_groups[0]['lr']
-                    self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                    logger.info("Shrinking the learning rate: %.5f -> %.5f"
-                                , old_lr, self.gen_optimizer.param_groups[0]['lr'])
+                old_lr = self.gen_optimizer.param_groups[0]['lr']
+                self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
+                self.params.epoch_size //= 2
+            else:
+                logger.info("The validation metric is getting better")
+            self.prev_metric = to_log[metric]
 
-    # def save_best(self, to_log, metric):
-    #     """
-    #     Save the best model for the given validation metric.
-    #     """
-    #     # best generator for the given validation criterion
-    #     if to_log[metric] > self.best_valid_metric:
-    #         # new best generator
-    #         self.best_valid_metric = to_log[metric]
-    #         logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
-    #         # save the generator
+    def save_best(self, to_log, metric):
+        """
+        Save the best model for the given validation metric.
+        """
+        # best generator for the given validation criterion
+        if to_log[metric] > self.best_valid_metric:
+            # new best generator
+            self.best_valid_metric = to_log[metric]
+            logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
+            # save the generator
 
-    #         W = self.generator.weight.detach().cpu().numpy()
-    #         path = os.path.join(self.params.exp_path, 'best_generator.pth')
-    #         logger.info('* Saving the generator to %s ...', path)
-    #         torch.save(W, path)
+            for i in range(self.params.langnum-1):
+                W = self.generator.mappings[i].weight.detach().cpu().numpy()
+                path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
+                logger.info('* Saving the generator to %s ...', path)
+                torch.save(W, path)
 
     # def reload_best(self):
     #     """

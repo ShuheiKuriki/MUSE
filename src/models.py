@@ -35,6 +35,8 @@ class Discriminator(nn.Module):
                 layers.append(nn.LeakyReLU(0.2))
                 layers.append(nn.Dropout(self.dis_dropout))
         # layers.append(nn.Sigmoid())
+        # if params.test:
+        # layers.append(nn.Softmax(dim=1))
         layers.append(nn.LogSoftmax(dim=1))
         self.layers = nn.Sequential(*layers)
 
