@@ -225,7 +225,7 @@ def get_crosslingual_wordsim_scores(lang1, word2id1, embeddings1,
 
     task_name = '%s_%s_SEMEVAL17' % (lang1.upper(), lang2.upper())
     logger.info(pattern % (task_name, str(found), str(not_found), "%.4f" % coeff))
-    scores[task_name] = coeff
+    scores['SEMEVAL17'] = coeff
     if not scores:
         return None
     logger.info(separator)

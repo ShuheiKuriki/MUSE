@@ -189,12 +189,13 @@ if params.n_refinement:
         evaluator.all_eval(to_log)
 
         # JSON log / save best model / end of epoch
-        # logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_iter)
 
 trainer.reload_best()
 evaluator.all_eval(to_log, all_pair=True)
+logger.info("__log__:%s", json.dumps(to_log))
 logger.info('end of the examination')
 # export embeddings
 # if params.export:

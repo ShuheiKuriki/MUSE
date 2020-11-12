@@ -52,8 +52,8 @@ class Evaluator:
         if ws_scores is not None:
             ws_monolingual_scores = np.mean(list(ws_scores.values()))
             logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
-            to_log['ws_monolingual_scores'] = ws_monolingual_scores
-            to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
+            # to_log['ws_monolingual_scores'] = ws_monolingual_scores
+            # to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
 
     def monolingual_wordanalogy(self, to_log):
         """
@@ -79,7 +79,7 @@ class Evaluator:
             to_log['tgt_analogy_monolingual_scores'] = tgt_analogy_monolingual_scores
             to_log.update({'tgt_' + k: v for k, v in tgt_analogy_scores.items()})
 
-    def crosslingual_wordsim(self, i, j, to_log):
+    def crosslingual_wordsim(self, i, j, to_log, init):
         """
         Evaluation on cross-lingual word similarity.
         """
@@ -102,10 +102,17 @@ class Evaluator:
             return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
         logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
-        to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
-        to_log.update({'src_tgt_' + k: v for k, v in src_tgt_ws_scores.items()})
+        if init:
+            to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
+        else:
+            to_log['ws_crosslingual_scores'] += ws_crosslingual_scores
+        for k, v in src_tgt_ws_scores.items():
+            if init:
+                to_log['src_tgt_' + k] = v
+            else:
+                to_log['src_tgt_' + k] += v
 
-    def word_translation(self, i, j, to_log):
+    def word_translation(self, i, j, to_log, init):
         """
         Evaluation on word translation.
         """
@@ -121,7 +128,12 @@ class Evaluator:
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
-            to_log.update([('%s-%s' % (k, method), v) for k, v in results])
+            for k,v in results:
+                if init:
+                    to_log['{}-{}'.format(k, method)] = v
+                else:
+                    to_log['{}-{}'.format(k, method)] += v
+
 
     def sent_translation(self, i, j, to_log):
         """
@@ -180,7 +192,7 @@ class Evaluator:
             )
             to_log.update([('src_to_tgt_%s-%s' % (k, method), v) for k, v in results])
 
-    def dist_mean_cosine(self, to_log, i, tgt=False):
+    def dist_mean_cosine(self, to_log, i, tgt=False, init=False):
         """
         Mean-cosine model selection criterion.
         """
@@ -219,9 +231,8 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if i == 0 and (j == 1 or not tgt):
+            if init:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
-            else:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine
 
     def all_eval(self, to_log, all_pair=False):
@@ -229,6 +240,7 @@ class Evaluator:
         Run all evaluations.
         """
         self.generator.eval()
+        init = True
         for i in range(self.langnum):
             if not all_pair and i == self.langnum - 1:
                 continue
@@ -239,15 +251,22 @@ class Evaluator:
                     if i == j:
                         continue
                     logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
-                    self.crosslingual_wordsim(i, j, to_log)
-                    self.word_translation(i, j, to_log)
+                    self.crosslingual_wordsim(i, j, to_log, init)
+                    self.word_translation(i, j, to_log, init)
                     # self.sent_translation(i, j, to_log)
-                    self.dist_mean_cosine(to_log, i, tgt=j)
+                    self.dist_mean_cosine(to_log, i, tgt=j, init=init)
+                    init = False
             else:
-                self.crosslingual_wordsim(i, self.langnum-1, to_log)
-                self.word_translation(i, self.langnum-1, to_log)
+                self.crosslingual_wordsim(i, self.langnum-1, to_log, init)
+                self.word_translation(i, self.langnum-1, to_log, init)
                 # self.sent_translation(i, self.langnum-1, to_log)
-                self.dist_mean_cosine(to_log, i, tgt=False)
+                self.dist_mean_cosine(to_log, i, tgt=False, init=init)
+                init = False
+        for k in to_log.keys():
+            if all_pair:
+                to_log[k] /= self.langnum*(self.langnum-1)
+            else:
+                to_log[k] /= self.langnum-1
 
     def eval_dis(self, to_log):
         """
