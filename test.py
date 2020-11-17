@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python test.py --exp_id n_class_drop0.1_seed0 --dis_input_dropout 0.1 --seed 0
+# python test.py --seed 0 --cuda False
 import os
 import time
 import json
@@ -49,12 +49,14 @@ parser.add_argument("--dis_steps", type=int, default=5, help="Discriminator step
 parser.add_argument("--dis_lambda", type=float, default=1, help="Discriminator loss feedback coefficient")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
-parser.add_argument("--dis_clip_weights", type=float, default=0, help="Clip discriminator weights (0 to disable)")
+parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
+# parser.add_argument("--dis_clip_weights", type=float, default=0, help="Clip discriminator weights (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
+parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
