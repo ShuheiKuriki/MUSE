@@ -8,6 +8,7 @@
 
 from logging import getLogger
 from copy import deepcopy
+import json
 import numpy as np
 import torch
 # from torch.autograd import Variable
@@ -37,8 +38,9 @@ class Evaluator:
         self.discriminator = trainer.discriminator
         self.params = trainer.params
         self.langnum = self.params.langnum
+        self.num_pairs = (self.langnum-1)*(self.langnum-2)//2
 
-    def monolingual_wordsim(self, i, to_log):
+    def monolingual_wordsim(self, i):
         """
         Evaluation on monolingual word similarity.
         """
@@ -49,8 +51,8 @@ class Evaluator:
         if ws_scores is not None:
             ws_monolingual_scores = np.mean(list(ws_scores.values()))
             logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
-            to_log['ws_monolingual_scores'] = ws_monolingual_scores
-            to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
+            # to_log['ws_monolingual_scores'] = ws_monolingual_scores
+            # to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
 
     def monolingual_wordanalogy(self, to_log):
         """
@@ -94,7 +96,11 @@ class Evaluator:
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
         logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
         to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
-        to_log.update({'src_tgt_' + k: v for k, v in src_tgt_ws_scores.items()})
+        for k, v in src_tgt_ws_scores.items():
+            if i == 0 and j == 1:
+                to_log['src_tgt_' + k] = v/self.num_pairs
+            else:
+                to_log['src_tgt_' + k] += v/self.num_pairs
 
     def word_translation(self, i, j, to_log):
         """
@@ -103,10 +109,14 @@ class Evaluator:
         # mapped word embeddings
         src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
         tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
-
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
             to_log.update([('%s-%s' % (k, method), v) for k, v in results])
+            for k, v in results:
+                if i == 0 and j == 1:
+                    to_log['{}-{}'.format(k, method)] = v/self.num_pairs
+                else:
+                    to_log['{}-{}'.format(k, method)] += v/self.num_pairs
 
     def sent_translation(self, i, j, to_log):
         """
@@ -193,9 +203,9 @@ class Evaluator:
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
             if i == 0:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine/(self.langnum-1)
             else:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine/(self.langnum-1)
 
     def all_eval(self, to_log):
         """
@@ -204,7 +214,7 @@ class Evaluator:
         self.generator.eval()
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
-            self.monolingual_wordsim(i, to_log)
+            self.monolingual_wordsim(i)
             for j in range(self.langnum-1):
                 if i == j:
                     continue
@@ -214,6 +224,7 @@ class Evaluator:
                 # self.sent_translation(i, j, to_log)
         for i in range(self.langnum-1):
             self.dist_mean_cosine(to_log, i)
+        logger.info("__log__:%s", json.dumps(to_log))
 
     def eval_dis(self, to_log):
         """
