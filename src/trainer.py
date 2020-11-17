@@ -79,9 +79,10 @@ class Trainer():
         for i in range(langnum-1):
             embs[i] = self.generator(self.embs[i](ids[i]).detach(), i)
         embs[-1] = self.embs[-1](ids[-1])
-        # if self.params.test:
-            # logger.info(self.embs[0].weight.detach()[0][:10])
-            # logger.info(self.embs[1].weight.detach()[0][:10])
+        if self.params.test:
+            for i in range(langnum):
+                logger.info(i)
+                logger.info(self.embs[i].weight.detach()[0][:10])
 
         # input / target
         x = torch.cat(embs, 0)

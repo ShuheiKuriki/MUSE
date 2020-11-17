@@ -156,10 +156,9 @@ if params.adversarial:
     if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
       logger.info('We got the best metric.')
       break
-    p = params.langnum
-    if n_epoch >= 4 and trainer.best_valid_metric < 0.17 * p * (p-1):
-      logger.info('Learning failed')
-      break
+    # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
+      # logger.info('Learning failed')
+      # break
     if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
       logger.info('Learning rate < 1e-6. BREAK.')
       break

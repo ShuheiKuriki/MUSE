@@ -89,10 +89,10 @@ assert params.export in ["", "txt", "pth"]
 # build model / trainer / evaluator
 logger = initialize_exp(params)
 params.test = True
-params.langs = params.langs.split('_')
+params.langs = params.langs.split('_')+['random']
 params.langnum = len(params.langs)
 params.embpaths = []
-for i in range(params.langnum):
+for i in range(params.langnum-1):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
 embs, generator, discriminator = build_model(params, True)
 trainer = Trainer(embs, generator, discriminator, params)
