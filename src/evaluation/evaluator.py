@@ -38,7 +38,7 @@ class Evaluator:
         self.discriminator = trainer.discriminator
         self.params = trainer.params
         self.langnum = self.params.langnum
-        self.num_pairs = (self.langnum-1)*(self.langnum-2)//2
+        self.num_pairs = (self.langnum-1)*(self.langnum-2)
 
     def monolingual_wordsim(self, i):
         """
@@ -95,7 +95,7 @@ class Evaluator:
             return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
         logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
-        to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
+        # to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         for k, v in src_tgt_ws_scores.items():
             if i == 0 and j == 1:
                 to_log['src_tgt_' + k] = v/self.num_pairs
@@ -111,7 +111,7 @@ class Evaluator:
         tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
-            to_log.update([('%s-%s' % (k, method), v) for k, v in results])
+            # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
             for k, v in results:
                 if i == 0 and j == 1:
                     to_log['{}-{}'.format(k, method)] = v/self.num_pairs
@@ -169,14 +169,13 @@ class Evaluator:
             )
             to_log.update([('src_to_tgt_%s-%s' % (k, method), v) for k, v in results])
 
-    def dist_mean_cosine(self, to_log, i):
+    def dist_mean_cosine(self, to_log, i, j):
         """
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        j = self.langnum-1
         src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        tgt_emb = self.embs[j].weight.detach()
+        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
 
@@ -202,10 +201,10 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if i == 0:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine/(self.langnum-1)
+            if i == 0 and j == 1:
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine/self.num_pairs
             else:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine/(self.langnum-1)
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine/self.num_pairs
 
     def all_eval(self, to_log):
         """
@@ -222,8 +221,7 @@ class Evaluator:
                 self.crosslingual_wordsim(i, j, to_log)
                 self.word_translation(i, j, to_log)
                 # self.sent_translation(i, j, to_log)
-        for i in range(self.langnum-1):
-            self.dist_mean_cosine(to_log, i)
+                self.dist_mean_cosine(to_log, i, j)
         logger.info("__log__:%s", json.dumps(to_log))
 
     def eval_dis(self, to_log):
