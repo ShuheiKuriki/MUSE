@@ -76,10 +76,9 @@ class Trainer():
 
         # get word embeddings
         embs = [0]*langnum
-        for i in range(langnum):
-            embs[i] = self.embs[i](ids[i]).detach()
         for i in range(langnum-1):
-            embs[i] = self.generator(embs[i], i)
+            embs[i] = self.generator(self.embs[i](ids[i]).detach(), i)
+        embs[-1] = self.embs[-1](ids[-1])
         # if self.params.test:
             # logger.info(self.embs[0].weight.detach()[0][:10])
             # logger.info(self.embs[1].weight.detach()[0][:10])
@@ -175,7 +174,7 @@ class Trainer():
 
         # cross_entropy -F(y)の場合
         # loss = -torch.mean(torch.sum(-y*preds, dim=1))
-        loss = torch.mean(torch.sum(-(self.params.entropy_lambda/self.langnum-y)*preds, dim=1))
+        loss = torch.mean(torch.sum(-(self.params.entropy_coef/self.langnum-y)*preds, dim=1))
 
         # check NaN
         if (loss != loss).detach().any():

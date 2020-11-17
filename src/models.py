@@ -83,19 +83,17 @@ def build_model(params, with_dis):
     Build all components of the model.
     """
     # embeddings
-    dicos, _embs = [0]*params.langnum, [0]*params.langnum
-    for i in range(params.langnum):
+    dicos, _embs = [0]*(params.langnum-1), [0]*(params.langnum-1)
+    for i in range(params.langnum-1):
         dicos[i], _embs[i] = load_embeddings(params, i)
     params.dicos = dicos
-    embs = [nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(params.langnum)]
-    for i in range(params.langnum):
+    embs = [0]*params.langnum
+    for i in range(params.langnum-1):
+        embs[i] = nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True)
+    embs[-1] = nn.Embedding(params.dis_most_frequent, params.emb_dim, sparse=True)
+    for i in range(params.langnum-1):
         embs[i].weight.detach().copy_(_embs[i])
 
-    # mapping
-    # mappings = [nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(params.langnum-1)]
-    # if getattr(params, 'map_id_init', True):
-        # for i in range(params.langnum-1):
-            # mappings[i].weight.data.copy_(torch.diag(torch.ones(params.emb_dim)))
     generator = Generator(params)
 
     # discriminator

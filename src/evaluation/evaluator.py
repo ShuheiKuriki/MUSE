@@ -42,10 +42,7 @@ class Evaluator:
         """
         Evaluation on monolingual word similarity.
         """
-        if i < self.langnum-1:
-            emb = self.generator(self.embs[i].weight.detach(), i)
-        else:
-            emb = self.embs[i].weight.detach()
+        emb = self.embs[i].weight.detach()
         ws_scores = get_wordsim_scores(
             self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy()
         )
@@ -83,14 +80,8 @@ class Evaluator:
         """
         Evaluation on cross-lingual word similarity.
         """
-        if i == self.langnum-1:
-            src_emb = self.embs[i].weight
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i)
-        if j == self.langnum-1:
-            tgt_emb = self.embs[j].weight
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j)
+        src_emb = self.generator(self.embs[i].weight.detach(), i)
+        tgt_emb = self.generator(self.embs[j].weight.detach(), j)
         src_emb = src_emb.detach().cpu().numpy()
         tgt_emb = tgt_emb.detach().cpu().numpy()
         # cross-lingual wordsim evaluation
@@ -110,14 +101,8 @@ class Evaluator:
         Evaluation on word translation.
         """
         # mapped word embeddings
-        if i == self.langnum-1:
-            src_emb = self.embs[i].weight.detach()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
 
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
@@ -147,14 +132,8 @@ class Evaluator:
             return
 
         # mapped word embeddings
-        if i == self.langnum-1:
-            src_emb = self.embs[i].weight.detach()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
 
@@ -180,20 +159,14 @@ class Evaluator:
             )
             to_log.update([('src_to_tgt_%s-%s' % (k, method), v) for k, v in results])
 
-    def dist_mean_cosine(self, to_log, i, tgt=False):
+    def dist_mean_cosine(self, to_log, i):
         """
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        j = self.langnum-1 if not tgt else tgt
-        if i == self.langnum-1:
-            src_emb = self.embs[i].weight.detach()
-        else:
-            src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        if j == self.langnum-1:
-            tgt_emb = self.embs[j].weight.detach()
-        else:
-            tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        j = self.langnum-1
+        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.embs[j].weight.detach()
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
 
@@ -219,35 +192,28 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if i == 0 and (j == 1 or not tgt):
+            if i == 0:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine
             else:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine
 
-    def all_eval(self, to_log, all_pair=False):
+    def all_eval(self, to_log):
         """
         Run all evaluations.
         """
         self.generator.eval()
-        for i in range(self.langnum):
-            if not all_pair and i == self.langnum - 1:
-                continue
+        for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i, to_log)
-            if all_pair:
-                for j in range(self.langnum):
-                    if i == j:
-                        continue
-                    logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
-                    self.crosslingual_wordsim(i, j, to_log)
-                    self.word_translation(i, j, to_log)
-                    # self.sent_translation(i, j, to_log)
-                    self.dist_mean_cosine(to_log, i, tgt=j)
-            else:
-                self.crosslingual_wordsim(i, self.langnum-1, to_log)
-                self.word_translation(i, self.langnum-1, to_log)
-                # self.sent_translation(i, self.langnum-1, to_log)
-                self.dist_mean_cosine(to_log, i, tgt=False)
+            for j in range(self.langnum-1):
+                if i == j:
+                    continue
+                logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
+                self.crosslingual_wordsim(i, j, to_log)
+                self.word_translation(i, j, to_log)
+                # self.sent_translation(i, j, to_log)
+        for i in range(self.langnum-1):
+            self.dist_mean_cosine(to_log, i)
 
     def eval_dis(self, to_log):
         """
