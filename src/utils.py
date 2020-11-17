@@ -1,3 +1,6 @@
+"""
+utils
+"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -66,7 +69,7 @@ def initialize_exp(params):
     logger.info('The experiment will be stored in %s', params.exp_path)
     if params.cuda:
         torch.cuda.set_device(params.device)
-    logger.info('current device is %s', str(torch.cuda.current_device()))
+        logger.info('current device is %s', str(torch.cuda.current_device()))
     return logger
 
 
@@ -396,7 +399,7 @@ def load_embeddings(params, i, full_vocab=False):
     """
     emb_path = params.embpaths[i]
     lang = params.langs[i]
-    type(full_vocab) is bool
+    isinstance(full_vocab, bool)
     if emb_path.endswith('.pth'):
         return load_pth_embeddings(params, emb_path, lang, full_vocab)
     if emb_path.endswith('.bin'):

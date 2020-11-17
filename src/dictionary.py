@@ -1,3 +1,4 @@
+"""dictionary id2word+word2id"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
@@ -11,7 +12,10 @@ from logging import getLogger
 logger = getLogger()
 
 
-class Dictionary(object):
+class Dictionary():
+    """
+    dictionary id2word+word2id
+    """
 
     def __init__(self, id2word, word2id, lang):
         assert len(id2word) == len(word2id)
