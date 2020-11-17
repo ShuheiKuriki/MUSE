@@ -24,7 +24,7 @@ def get_word_pairs(path, lower=True):
     """
     Return a list of (word1, word2, score) tuples from a word similarity file.
     """
-    assert os.path.isfile(path) and type(lower) is bool
+    assert os.path.isfile(path) and isinstance(lower, bool)
     word_pairs = []
     with io.open(path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -46,7 +46,7 @@ def get_word_id(word, word2id, lower):
     If the model does not use lowercase and the evaluation file is lowercased,
     we might be able to find an associated word.
     """
-    assert type(lower) is bool
+    assert isinstance(lower, bool)
     word_id = word2id.get(word)
     if word_id is None and not lower:
         word_id = word2id.get(word.capitalize())
@@ -65,7 +65,7 @@ def get_spearman_rho(word2id1, embeddings1, path, lower,
     embeddings2 = embeddings1 if embeddings2 is None else embeddings2
     assert len(word2id1) == embeddings1.shape[0]
     assert len(word2id2) == embeddings2.shape[0]
-    assert type(lower) is bool
+    assert isinstance(lower, bool)
     word_pairs = get_word_pairs(path)
     not_found = 0
     pred = []
@@ -96,14 +96,14 @@ def get_wordsim_scores(language, word2id, embeddings, lower=True):
     separator = "=" * (30 + 1 + 10 + 1 + 13 + 1 + 12)
     pattern = "%30s %10s %13s %12s"
     logger.info(separator)
-    logger.info(pattern % ("Dataset", "Found", "Not found", "Rho"))
+    logger.info(pattern, "Dataset", "Found", "Not found", "Rho")
     logger.info(separator)
 
     for filename in list(os.listdir(dirpath)):
         if filename.startswith('%s_' % (language.upper())):
             filepath = os.path.join(dirpath, filename)
             coeff, found, not_found = get_spearman_rho(word2id, embeddings, filepath, lower)
-            logger.info(pattern % (filename[:-4], str(found), str(not_found), "%.4f" % coeff))
+            logger.info(pattern, filename[:-4], str(found), str(not_found), "%.4f" % coeff)
             scores[filename[:-4]] = coeff
     logger.info(separator)
 
@@ -156,14 +156,12 @@ def get_wordanalogy_scores(language, word2id, embeddings, lower=True):
             if any(x is None for x in [word_id1, word_id2, word_id3, word_id4]):
                 scores[category]['n_not_found'] += 1
                 continue
-            else:
-                scores[category]['n_found'] += 1
-                word_ids[category].append([word_id1, word_id2, word_id3, word_id4])
-                # generate query vector and get nearest neighbors
-                query = embeddings[word_id1] - embeddings[word_id2] + embeddings[word_id4]
-                query = query / np.linalg.norm(query)
-
-                queries[category].append(query)
+            scores[category]['n_found'] += 1
+            word_ids[category].append([word_id1, word_id2, word_id3, word_id4])
+            # generate query vector and get nearest neighbors
+            query = embeddings[word_id1] - embeddings[word_id2] + embeddings[word_id4]
+            query = query / np.linalg.norm(query)
+            queries[category].append(query)
 
     # Compute score for each category
     for cat in queries:
@@ -181,7 +179,7 @@ def get_wordanalogy_scores(language, word2id, embeddings, lower=True):
     separator = "=" * (30 + 1 + 10 + 1 + 13 + 1 + 12)
     pattern = "%30s %10s %13s %12s"
     logger.info(separator)
-    logger.info(pattern % ("Category", "Found", "Not found", "Accuracy"))
+    logger.info(pattern, "Category", "Found", "Not found", "Accuracy")
     logger.info(separator)
 
     # compute and log accuracies
@@ -189,7 +187,7 @@ def get_wordanalogy_scores(language, word2id, embeddings, lower=True):
     for k in sorted(scores.keys()):
         v = scores[k]
         accuracies[k] = float(v['n_correct']) / max(v['n_found'], 1)
-        logger.info(pattern % (k, str(v['n_found']), str(v['n_not_found']), "%.4f" % accuracies[k]))
+        logger.info(pattern, k, str(v['n_found']), str(v['n_not_found']), "%.4f" % accuracies[k])
     logger.info(separator)
 
     return accuracies
@@ -220,12 +218,12 @@ def get_crosslingual_wordsim_scores(lang1, word2id1, embeddings1,
     separator = "=" * (30 + 1 + 10 + 1 + 13 + 1 + 12)
     pattern = "%30s %10s %13s %12s"
     logger.info(separator)
-    logger.info(pattern % ("Dataset", "Found", "Not found", "Rho"))
+    logger.info(pattern, "Dataset", "Found", "Not found", "Rho")
     logger.info(separator)
 
     task_name = '%s_%s_SEMEVAL17' % (lang1.upper(), lang2.upper())
-    logger.info(pattern % (task_name, str(found), str(not_found), "%.4f" % coeff))
-    scores[task_name] = coeff
+    logger.info(pattern, task_name, str(found), str(not_found), "%.4f" % coeff)
+    scores['SEMEVAL17'] = coeff
     if not scores:
         return None
     logger.info(separator)
