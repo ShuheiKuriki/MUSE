@@ -285,10 +285,10 @@ class Trainer():
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
                 old_lr = self.gen_optimizer.param_groups[0]['lr']
-                self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
+                # self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                # logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
-                self.params.epoch_size //= 2
+                # self.params.epoch_size //= 2
             else:
                 logger.info("The validation metric is getting better")
             self.prev_metric = to_log[metric]
