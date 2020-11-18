@@ -82,7 +82,7 @@ class Trainer():
         if self.params.test:
             for i in range(langnum):
                 logger.info(i)
-                logger.info(self.embs[i].weight.detach()[0][:10])
+                logger.info(torch.sum(self.embs[i].weight.detach()))
 
         # input / target
         x = torch.cat(embs, 0)
