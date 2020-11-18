@@ -94,8 +94,8 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum-1):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-embs, generator, discriminator = build_model(params, True)
-trainer = Trainer(embs, generator, discriminator, params)
+generator, discriminator = build_model(params, True)
+trainer = Trainer(generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
 # Learning loop for Adversarial Training

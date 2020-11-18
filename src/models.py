@@ -58,6 +58,15 @@ class Generator(nn.Module):
         self.map_beta = params.map_beta
         self.langnum = params.langnum
 
+        dicos, _embs = [0]*(params.langnum-1), [0]*(params.langnum-1)
+        for i in range(params.langnum-1):
+            dicos[i], _embs[i] = load_embeddings(params, i)
+        params.dicos = dicos
+        wordnums = [len(dicos[i]) for i in range(params.langnum-1)] + [params.max_vocab]
+        self.embs = nn.ModuleList([nn.Embedding(wordnums[i], params.emb_dim, sparse=True) for i in range(self.langnum)])
+        for i in range(params.langnum-1):
+            self.embs[i].weight.detach().copy_(_embs[i])
+
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
@@ -83,16 +92,16 @@ def build_model(params, with_dis):
     Build all components of the model.
     """
     # embeddings
-    dicos, _embs = [0]*(params.langnum-1), [0]*(params.langnum-1)
-    for i in range(params.langnum-1):
-        dicos[i], _embs[i] = load_embeddings(params, i)
-    params.dicos = dicos
-    embs = [0]*params.langnum
-    for i in range(params.langnum-1):
-        embs[i] = nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True)
-    embs[-1] = nn.Embedding(params.dis_most_frequent, params.emb_dim, sparse=True)
-    for i in range(params.langnum-1):
-        embs[i].weight.detach().copy_(_embs[i])
+    # dicos = [0]*(params.langnum-1)
+    # for i in range(params.langnum-1):
+    #     dicos[i], _embs[i] = load_embeddings(params, i)
+    # params.dicos = dicos
+    # embs = [0]*params.langnum
+    # for i in range(params.langnum-1):
+    #     embs[i] = nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True)
+    # embs[-1] = nn.Embedding(params.dis_most_frequent, params.emb_dim, sparse=True)
+    # for i in range(params.langnum-1):
+    #     embs[i].weight.detach().copy_(_embs[i])
 
     generator = Generator(params)
 
@@ -101,13 +110,13 @@ def build_model(params, with_dis):
 
     # cuda
     if params.cuda:
-        for i in range(params.langnum):
-            embs[i].cuda()
+        # for i in range(params.langnum):
+            # embs[i].cuda()
         generator.cuda()
         if with_dis:
             discriminator.cuda()
 
     # normalize embeddings
-    params.means = [normalize_embeddings(embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
+    params.means = [normalize_embeddings(generator.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
 
-    return embs, generator, discriminator
+    return generator, discriminator
