@@ -60,6 +60,7 @@ parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy 
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
+parser.add_argument("--truncated", type=float, default=50, help="initialize embeddings as truncated normal distribution")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")

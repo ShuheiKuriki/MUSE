@@ -407,7 +407,7 @@ def load_embeddings(params, i, full_vocab=False):
     return read_txt_embeddings(params, emb_path, lang, full_vocab)
 
 
-def normalize_embeddings(emb, types, mean=None):
+def normalize_embeddings(emb, types, cuda=False, mean=None):
     """
     Normalize embeddings by their norms / recenter them.
     """
@@ -422,6 +422,8 @@ def normalize_embeddings(emb, types, mean=None):
             emb.div_(emb.norm(2, 1, keepdim=True).expand_as(emb))
         else:
             raise Exception('Unknown normalization type: "%s"' % t)
+    if cuda:
+        return mean if mean is not None else None
     return mean.cpu() if mean is not None else None
 
 

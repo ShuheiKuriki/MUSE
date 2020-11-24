@@ -53,14 +53,15 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=15, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=300000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
-parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
+parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
+parser.add_argument("--truncated", type=float, default=50, help="initialize embeddings as truncated normal distribution")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -96,8 +97,7 @@ assert params.export in ["", "txt", "pth"]
 # build model / trainer / evaluator
 logger = initialize_exp(params)
 params.test = False
-params.langs = params.langs.split('_')
-params.langs.append('random')
+params.langs = params.langs.split('_')+['random']
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum-1):

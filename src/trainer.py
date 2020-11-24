@@ -70,7 +70,7 @@ class Trainer():
             if self.params.test:
                 ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
             else:
-                ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
+                ids[i] = torch.LongTensor(bs).random_(mf)
             if self.params.cuda:
                 ids[i] = ids[i].cuda()
 
@@ -82,7 +82,7 @@ class Trainer():
         if self.params.test:
             for i in range(langnum):
                 logger.info(i)
-                logger.info(torch.sum(self.embs[i].weight.detach()))
+                logger.info(torch.mean(torch.norm(self.embs[i].weight.detach(), dim=1)))
 
         # input / target
         x = torch.cat(embs, 0)

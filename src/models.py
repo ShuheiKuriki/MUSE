@@ -7,7 +7,10 @@
 #
 
 import torch
+import numpy as np
 from torch import nn
+import torch.nn.functional as F
+from scipy.stats import truncnorm
 from .utils import load_embeddings, normalize_embeddings
 
 class Discriminator(nn.Module):
@@ -83,16 +86,19 @@ def build_model(params, with_dis):
     Build all components of the model.
     """
     # embeddings
-    dicos, _embs = [0]*(params.langnum-1), [0]*(params.langnum-1)
+    dicos, _embs = [0]*(params.langnum-1), [0]*params.langnum
     for i in range(params.langnum-1):
         dicos[i], _embs[i] = load_embeddings(params, i)
     params.dicos = dicos
+    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.dis_most_frequent, params.emb_dim]))
+
     embs = [0]*params.langnum
     for i in range(params.langnum-1):
-        embs[i] = nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True)
-    embs[-1] = nn.Embedding(params.dis_most_frequent, params.emb_dim, sparse=True)
-    for i in range(params.langnum-1):
+        embs[i] = nn.Embedding(len(dicos[i]), params.emb_dim)
+    embs[-1] = nn.Embedding(params.dis_most_frequent, params.emb_dim)
+    for i in range(params.langnum):
         embs[i].weight.detach().copy_(_embs[i])
+    embs[-1].weight.detach().div_(3)
 
     generator = Generator(params)
 
