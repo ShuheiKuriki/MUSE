@@ -70,7 +70,7 @@ class Trainer():
             if self.params.test:
                 ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
             else:
-                ids[i] = torch.LongTensor(bs).random_(len(self.dicos[i]) if mf == 0 else mf)
+                ids[i] = torch.LongTensor(bs).random_(mf)
             if self.params.cuda:
                 ids[i] = ids[i].cuda()
 
@@ -82,7 +82,7 @@ class Trainer():
         if self.params.test:
             for i in range(langnum):
                 logger.info(i)
-                logger.info(torch.sum(self.embs[i].weight.detach()))
+                logger.info(self.embs[i].weight.detach()[0, :10])
 
         # input / target
         x = torch.cat(embs, 0)
@@ -159,13 +159,13 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        logger.info(torch.sum(self.embs[-1]))
+        # logger.info(torch.mean(torch.norm(self.embs[-1].weight.detach(), dim=1)))
         preds = self.discriminator(x)
         # if self.params.test:
         #     logger.info('gen_start')
         #     logger.info(torch.exp(preds[:10]))
         #     logger.info(self.generator.mappings[0].weight[0][:10])
-        loss = 0
+        # loss = 0
         # print(y)
 
         # binary_cross_entropy F(1-y)の場合

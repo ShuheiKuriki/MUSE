@@ -7,7 +7,9 @@
 #
 
 import torch
+import numpy as np
 from torch import nn
+from scipy.stats import truncnorm
 from .utils import load_embeddings, normalize_embeddings
 
 class Discriminator(nn.Module):
@@ -58,14 +60,16 @@ class Generator(nn.Module):
         self.map_beta = params.map_beta
         self.langnum = params.langnum
 
-        dicos, _embs = [0]*(params.langnum-1), [0]*(params.langnum-1)
+        dicos, _embs = [0]*(params.langnum-1), [0]*params.langnum
         for i in range(params.langnum-1):
             dicos[i], _embs[i] = load_embeddings(params, i)
+        _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.dis_most_frequent, params.emb_dim]))
         params.dicos = dicos
-        wordnums = [len(dicos[i]) for i in range(params.langnum-1)] + [params.max_vocab]
-        self.embs = nn.ModuleList([nn.Embedding(wordnums[i], params.emb_dim, sparse=True) for i in range(self.langnum)])
+        wordnums = [len(dicos[i]) for i in range(params.langnum-1)] + [params.dis_most_frequent]
+        self.embs = nn.ModuleList([nn.Embedding(wordnums[i], params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(params.langnum-1):
             self.embs[i].weight.detach().copy_(_embs[i])
+        self.embs[-1].weight.detach().copy_(_embs[-1])
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
