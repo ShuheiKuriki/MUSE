@@ -53,7 +53,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=15, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=300000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
