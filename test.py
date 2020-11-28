@@ -37,6 +37,7 @@ parser.add_argument("--export", type=str, default="txt", help="Export embeddings
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
+parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -50,7 +51,6 @@ parser.add_argument("--dis_lambda", type=float, default=1, help="Discriminator l
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
-# parser.add_argument("--dis_clip_weights", type=float, default=0, help="Clip discriminator weights (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
@@ -70,8 +70,6 @@ parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum di
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
-# parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
-# parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
 # parse parameters
@@ -95,7 +93,7 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum-1):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-generator, discriminator = build_model(params, True)
+generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)
 evaluator = Evaluator(trainer)
 

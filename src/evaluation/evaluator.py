@@ -38,7 +38,7 @@ class Evaluator:
         self.discriminator = trainer.discriminator
         self.params = trainer.params
         self.langnum = self.params.langnum
-        self.num_pairs = (self.langnum-1)*(self.langnum-2)
+        # self.num_pairs = (self.langnum-1)*(self.langnum-2)x
 
     def monolingual_wordsim(self, i):
         """
@@ -97,10 +97,10 @@ class Evaluator:
         logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
         # to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         for k, v in src_tgt_ws_scores.items():
-            if i == 0 and j == 1:
-                to_log['src_tgt_' + k] = v/self.num_pairs
+            if 'src_tgt_' + k in to_log:
+                to_log['src_tgt_' + k].append(v)
             else:
-                to_log['src_tgt_' + k] += v/self.num_pairs
+                to_log['src_tgt_' + k] = [v]
 
     def word_translation(self, i, j, to_log):
         """
@@ -113,10 +113,10 @@ class Evaluator:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
             # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
             for k, v in results:
-                if i == 0 and j == 1:
-                    to_log['{}-{}'.format(k, method)] = v/self.num_pairs
+                if '{}-{}'.format(k, method) in to_log:
+                    to_log['{}-{}'.format(k, method)].append(v)
                 else:
-                    to_log['{}-{}'.format(k, method)] += v/self.num_pairs
+                    to_log['{}-{}'.format(k, method)] = [v]
 
     def sent_translation(self, i, j, to_log):
         """
@@ -176,13 +176,13 @@ class Evaluator:
         # get normalized embeddings
         src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
         tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
-        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
+        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
         # build dictionary
         for dico_method in ['nn', 'csls_knn_10']:
             dico_build = 'S2T'
-            dico_max_size = 10000
+            dico_max_size = self.params.random_vocab
             # temp params / dictionary generation
             _params = deepcopy(self.params)
             _params.dico_method = dico_method
@@ -201,10 +201,10 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if i == 0 and j == 1:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = mean_cosine/self.num_pairs
+            if 'mean_cosine-{}-{}-{}'.format(dico_method, _params.dico_build, dico_max_size) in to_log:
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)].append(mean_cosine)
             else:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] += mean_cosine/self.num_pairs
+                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = [mean_cosine]
 
     def all_eval(self, to_log):
         """
@@ -221,7 +221,10 @@ class Evaluator:
                 self.crosslingual_wordsim(i, j, to_log)
                 self.word_translation(i, j, to_log)
                 # self.sent_translation(i, j, to_log)
-                self.dist_mean_cosine(to_log, i, j)
+            self.dist_mean_cosine(to_log, i, self.langnum-1)
+        for k in to_log:
+            if isinstance(to_log[k], list):
+                to_log[k] = sum(to_log[k])/len(to_log[k])
         logger.info("__log__:%s", json.dumps(to_log))
 
     def eval_dis(self, to_log):

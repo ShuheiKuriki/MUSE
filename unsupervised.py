@@ -20,7 +20,6 @@ from src.trainer import Trainer
 from src.evaluation import Evaluator
 
 
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-10000'
 
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
@@ -34,10 +33,9 @@ parser.add_argument("--device", type=int, default=0, help="select cuda device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
-# parser.add_argument("--tgt_lang", type=str, default='es', help="Target language")
-# parser.add_argument("--third_lang", type=str, default='en_dammy', help="Third language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
+parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -61,7 +59,7 @@ parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy 
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-parser.add_argument("--truncated", type=float, default=50, help="initialize embeddings as truncated normal distribution")
+parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution(0 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -73,8 +71,6 @@ parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum di
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
-# parser.add_argument("--src_emb", type=str, default="data/wiki.en.vec", help="Reload source embeddings")
-# parser.add_argument("--tgt_emb", type=str, default="data/wiki.es.vec", help="Reload target embeddings")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
 
@@ -94,6 +90,7 @@ assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
+VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.random_vocab)
 # build model / trainer / evaluator
 logger = initialize_exp(params)
 params.test = False
@@ -101,79 +98,80 @@ params.langs = params.langs.split('_')+['random']
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum-1):
-  params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-generator, discriminator = build_model(params, True)
+    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
 # Learning loop for Adversarial Training
 if params.adversarial:
-  logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+    logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
-  # training loop
-  for n_epoch in range(params.n_epochs):
+    # training loop
+    for n_epoch in range(params.n_epochs):
 
-    logger.info('Starting adversarial training epoch %i...', n_epoch)
-    tic = time.time()
-    n_words_proc = 0
-    stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-
-    for n_iter in range(0, params.epoch_size, params.batch_size):
-
-      # discriminator training
-      if np.random.rand() <= params.dis_sampling:
-        trainer.dis_step(stats)
-
-      # mapping training (discriminator fooling)
-      n_words_proc += trainer.gen_step(stats)
-
-      # log stats
-      if n_iter % 500 == 0:
-        stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-        stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-        stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-        stats_log = ' - '.join(stats_log)
-        logger.info('%06i - %s', n_iter, stats_log)
-
-        # reset
+        logger.info('Starting adversarial training epoch %i...', n_epoch)
         tic = time.time()
         n_words_proc = 0
-        for k, _ in stats_str:
-          del stats[k][:]
+        stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
 
-    # embeddings / discriminator evaluation
-    to_log = OrderedDict({'n_epoch': n_epoch})
-    evaluator.all_eval(to_log)
-    evaluator.eval_dis(to_log)
+        for n_iter in range(0, params.epoch_size, params.batch_size):
 
-    # save best model / end of epoch
-    trainer.save_best(to_log, VALIDATION_METRIC)
-    logger.info('End of epoch %i.\n\n', n_epoch)
+            # discriminator training
+            if np.random.rand() <= params.dis_sampling:
+                trainer.dis_step(stats)
 
-    # update the learning rate (stop if too small)
-    trainer.update_lr(to_log, VALIDATION_METRIC)
-    # if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
-      # logger.info('We got the best metric.')
-      # break
-    # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
-      # logger.info('Learning failed')
-      # break
-    if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
-      logger.info('Learning rate < 1e-6. BREAK.')
-      break
+            # mapping training (discriminator fooling)
+            n_words_proc += trainer.gen_step(stats)
 
-logger.info('The best metric is %.4f', trainer.best_valid_metric)
-# Learning loop for Procrustes Iterative Refinement
+            # log stats
+            if n_iter % 500 == 0:
+                stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+                stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
+                stats_log = ' - '.join(stats_log)
+                logger.info('%06i - %s', n_iter, stats_log)
+
+                # reset
+                tic = time.time()
+                n_words_proc = 0
+                for k, _ in stats_str:
+                    del stats[k][:]
+
+        # embeddings / discriminator evaluation
+        to_log = OrderedDict({'n_epoch': n_epoch})
+        evaluator.all_eval(to_log)
+        evaluator.eval_dis(to_log)
+
+        # save best model / end of epoch
+        trainer.save_best(to_log, VALIDATION_METRIC)
+        logger.info('End of epoch %i.\n\n', n_epoch)
+
+        # update the learning rate (stop if too small)
+        trainer.update_lr(to_log, VALIDATION_METRIC)
+        # if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
+        # logger.info('We got the best metric.')
+        # break
+        # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
+        # logger.info('Learning failed')
+        # break
+        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
+            logger.info('Learning rate < 1e-6. BREAK.')
+            break
+
+    logger.info('The best metric is %.4f', trainer.best_valid_metric)
+    # Learning loop for Procrustes Iterative Refinement
+
 if params.n_refinement:
-  # Get the best mapping according to VALIDATION_METRIC
-  logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-  trainer.reload_best()
+    # Get the best mapping according to VALIDATION_METRIC
+    logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
+    trainer.reload_best()
 
-  # training loop
-  for n_iter in range(params.n_refinement):
+    # training loop
+    for n_iter in range(params.n_refinement):
 
-    logger.info('Starting refinement iteration %i...', n_iter)
+        logger.info('Starting refinement iteration %i...', n_iter)
 
     # build a dictionary from aligned embeddings
     trainer.build_dictionary()
@@ -195,5 +193,5 @@ evaluator.all_eval(to_log)
 logger.info('end of the examination')
 # export embeddings
 # if params.export:
-  # trainer.reload_best()
-  # trainer.export()
+    # trainer.reload_best()
+    # trainer.export()

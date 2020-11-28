@@ -66,14 +66,16 @@ class Trainer():
         langnum = self.langnum
         assert mf <= min(map(len, self.dicos))
         ids = [0]*langnum
-        for i in range(langnum):
+        for i in range(langnum-1):
             if self.params.test:
                 ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
             else:
                 ids[i] = torch.LongTensor(bs).random_(mf)
-            if self.params.cuda:
+        ids[-1] = torch.LongTensor(bs).random_(self.params.random_vocab)
+        if self.params.cuda:
+            for i in range(self.langnum):
                 ids[i] = ids[i].cuda()
-
+        
         # get word embeddings
         embs = [0]*langnum
         for i in range(langnum-1):
@@ -87,14 +89,8 @@ class Trainer():
         # input / target
         x = torch.cat(embs, 0)
 
-        # binary_cross_entropyの場合
-        # y = torch.zeros(langnum * bs, dtype=torch.float32)
-        # for i in range(langnum):
-            # y[i*bs:(i+1)*bs] = 1-i+self.params.dis_smooth*(2*i-1)
-
         # cross_entropyの場合
         y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        # y[:, :] = self.params.dis_smooth/(langnum-1)
         for i in range(langnum):
             y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
 
@@ -119,12 +115,6 @@ class Trainer():
         # cross_entropyの場合
         loss = torch.mean(torch.sum(-y*preds, dim=1))
 
-        # binary_cross_entropyの場合
-        # loss = F.binary_cross_entropy(preds, y)
-
-        # loss *= self.params.dis_lambda
-        # print(loss)
-
         # check NaN
         if (loss != loss).detach().any():
             logger.error("NaN detected (discriminator)")
@@ -135,7 +125,6 @@ class Trainer():
         torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         loss.backward()
         self.dis_optimizer.step()
-        # clip_parameters(self.discriminator, self.params.dis_clip_weights)
 
         self.discriminator.eval()
         new_preds = self.discriminator(x.detach())
@@ -152,9 +141,6 @@ class Trainer():
         """
         Fooling discriminator training step.
         """
-        # if self.params.dis_lambda == 0:
-            # return 0
-
         self.discriminator.eval()
 
         # loss
@@ -165,17 +151,7 @@ class Trainer():
         #     logger.info('gen_start')
         #     logger.info(torch.exp(preds[:10]))
         #     logger.info(self.generator.mappings[0].weight[0][:10])
-        # loss = 0
-        # print(y)
 
-        # binary_cross_entropy F(1-y)の場合
-        # loss = self.params.dis_lambda * F.binary_cross_entropy(preds, 1-y)
-
-        # cross_entropy F(1-y)の場合
-        # loss = torch.mean(torch.sum(-(1-y)*preds, dim=1))
-
-        # cross_entropy -F(y)の場合
-        # loss = -torch.mean(torch.sum(-y*preds, dim=1))
         loss = torch.mean(torch.sum(-(self.params.entropy_coef/self.langnum-y)*preds, dim=1))
 
         # check NaN
@@ -259,16 +235,6 @@ class Trainer():
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
 
-    # def orthogonalize(self):
-    #     """
-    #     Orthogonalize the generator.
-    #     """
-    #     if self.params.gen_beta > 0:
-    #         beta = self.params.gen_beta
-    #         for i in range(self.langnum-1):
-    #             W = self.generator[i].weight.detach()
-    #             W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
-
     def update_lr(self, to_log, metric):
         """
         Update learning rate when using SGD.
@@ -286,10 +252,10 @@ class Trainer():
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
                 old_lr = self.gen_optimizer.param_groups[0]['lr']
-                # self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                # logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
+                self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
                 self.decrease_lr = True
-                # self.params.epoch_size //= 2
+                self.params.epoch_size = int(self.params.epoch_size * self.params.lr_shrink)
             else:
                 logger.info("The validation metric is getting better")
             self.prev_metric = to_log[metric]
