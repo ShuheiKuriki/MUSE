@@ -63,24 +63,30 @@ class Trainer():
         # select random word IDs
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
+        rv = self.params.random_vocab
         langnum = self.langnum
         assert mf <= min(map(len, self.dicos))
+
+        #get ids
         ids = [0]*langnum
         for i in range(langnum-1):
-            if self.params.test:
-                ids[i] = torch.arange(1, bs+1, dtype=torch.int64)
-            else:
-                ids[i] = torch.LongTensor(bs).random_(mf)
-        ids[-1] = torch.LongTensor(bs).random_(self.params.random_vocab)
+            ids[i] = torch.arange(1, bs+1, dtype=torch.int64) if self.params.test else torch.LongTensor(bs).random_(mf)
+        if rv:
+            ids[-1] = torch.LongTensor(bs).random_(rv)
+        else:
+            ids[-1] = torch.arange(1, bs+1, dtype=torch.int64) if self.params.test else torch.LongTensor(bs).random_(mf)
         if self.params.cuda:
             for i in range(self.langnum):
                 ids[i] = ids[i].cuda()
-        
+
         # get word embeddings
         embs = [0]*langnum
         for i in range(langnum-1):
             embs[i] = self.generator(self.embs[i](ids[i]).detach(), i)
         embs[-1] = self.embs[-1](ids[-1])
+        if not rv:
+            embs[-1] = embs[-1].detach()
+
         if self.params.test:
             for i in range(langnum):
                 logger.info(i)

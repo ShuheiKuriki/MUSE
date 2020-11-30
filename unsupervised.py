@@ -35,7 +35,7 @@ parser.add_argument("--export", type=str, default="txt", help="Export embeddings
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size")
+parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -44,7 +44,7 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=0.3, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
@@ -83,21 +83,22 @@ assert 0 <= params.dis_dropout < 1
 assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
 assert 0 < params.dis_sampling <= 1
-# assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
-# assert os.path.isfile(params.src_emb)
-# assert os.path.isfile(params.tgt_emb)
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.random_vocab)
+params.metric_size = params.random_vocab if params.random_vocab else 10000
+VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+
 # build model / trainer / evaluator
 logger = initialize_exp(params)
 params.test = False
-params.langs = params.langs.split('_')+['random']
+params.langs = params.langs.split('_')
+if params.random_vocab:
+    params.langs.append('random')
 params.langnum = len(params.langs)
 params.embpaths = []
-for i in range(params.langnum-1):
+for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
 generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)
@@ -188,6 +189,7 @@ if params.n_refinement:
     trainer.save_best(to_log, VALIDATION_METRIC)
     logger.info('End of refinement iteration %i.\n\n', n_iter)
 
+to_log = OrderedDict()
 trainer.reload_best()
 evaluator.all_eval(to_log)
 logger.info('end of the examination')

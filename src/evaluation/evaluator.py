@@ -182,7 +182,7 @@ class Evaluator:
         # build dictionary
         for dico_method in ['nn', 'csls_knn_10']:
             dico_build = 'S2T'
-            dico_max_size = self.params.random_vocab
+            dico_max_size = self.params.metric_size
             # temp params / dictionary generation
             _params = deepcopy(self.params)
             _params.dico_method = dico_method
@@ -214,13 +214,18 @@ class Evaluator:
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i)
-            for j in range(self.langnum-1):
-                if i == j:
-                    continue
-                logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
-                self.crosslingual_wordsim(i, j, to_log)
-                self.word_translation(i, j, to_log)
-                # self.sent_translation(i, j, to_log)
+            if self.params.random_vocab:
+                for j in range(self.langnum-1):
+                    if i == j:
+                        continue
+                    logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
+                    self.crosslingual_wordsim(i, j, to_log)
+                    self.word_translation(i, j, to_log)
+                    # self.sent_translation(i, j, to_log)
+            else:
+                self.crosslingual_wordsim(i, self.langnum-1, to_log)
+                self.word_translation(i, self.langnum-1, to_log)
+                # self.sent_translation(i, self.langnum-1, to_log)
             self.dist_mean_cosine(to_log, i, self.langnum-1)
         for k in to_log:
             if isinstance(to_log[k], list):

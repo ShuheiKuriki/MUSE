@@ -37,7 +37,7 @@ parser.add_argument("--export", type=str, default="txt", help="Export embeddings
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size")
+parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -88,10 +88,12 @@ assert params.export in ["", "txt", "pth"]
 # build model / trainer / evaluator
 logger = initialize_exp(params)
 params.test = True
-params.langs = params.langs.split('_')+['random']
+params.langs = params.langs.split('_')
+if params.random_vocab:
+    params.langs.append('random')
 params.langnum = len(params.langs)
 params.embpaths = []
-for i in range(params.langnum-1):
+for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
 generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)

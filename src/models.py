@@ -54,17 +54,21 @@ class Generator(nn.Module):
         self.map_beta = params.map_beta
         self.langnum = params.langnum
 
-        dicos, _embs = [0]*(params.langnum-1), [0]*params.langnum
+        dicos, _embs = [0]*params.langnum, [0]*params.langnum
         for i in range(params.langnum-1):
             dicos[i], _embs[i] = load_embeddings(params, i)
-        params.dicos = dicos
-        wordnums = [len(dicos[i]) for i in range(params.langnum-1)] + [params.random_vocab]
-        self.embs = nn.ModuleList([nn.Embedding(wordnums[i], params.emb_dim, sparse=False) for i in range(self.langnum)])
-        for i in range(params.langnum-1):
+        if params.random_vocab:
+            dicos[-1] = [0]*params.random_vocab
+            if params.truncated:
+                _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim]))
+            else:
+                _embs[-1] = torch.randn(params.random_vocab, params.emb_dim)
+        else:
+            dicos[-1], _embs[-1] = load_embeddings(params, self.langnum-1)
+        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
+        for i in range(params.langnum):
             self.embs[i].weight.detach().copy_(_embs[i])
-        if params.truncated:
-            _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim]))
-            self.embs[-1].weight.detach().copy_(_embs[-1])
+        params.dicos = dicos
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
@@ -74,9 +78,7 @@ class Generator(nn.Module):
     def forward(self, x, i):
         """map into target space"""
         assert x.dim() == 2 and x.size(1) == self.emb_dim
-        if i == self.langnum-1:
-            return x
-        return self.mappings[i](x)
+        return self.mappings[i](x) if i<self.langnum-1 else x
 
     def orthogonalize(self):
         """
