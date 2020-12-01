@@ -240,6 +240,7 @@ class Evaluator:
         langnum = self.langnum
         preds_ = [[] for _ in range(langnum)]
         pred_ = [0]*langnum
+        confusion_matrix = [[0]*langnum for _ in range(langnum)]
         self.discriminator.eval()
 
         for i in range(langnum):
@@ -252,21 +253,20 @@ class Evaluator:
                 preds_[i].extend(torch.exp(preds).detach().cpu().tolist())
             # pred_[i] = np.mean(preds_[i])
             pred_[i] = np.mean([x[i] for x in preds_[i]])
-            # print(preds_[i][0])
+            for x in preds_[i]:
+                max_prob = max(x)
+                for l in range(langnum):
+                    if x[l] == max_prob:
+                        confusion_matrix[i][l] += 1
 
             logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
 
-        accus = [0]*langnum
-        cnt = 0
-        total = sum([self.embs[i].num_embeddings for i in range(langnum)])
         for i in range(langnum):
-            # accus[i] = np.mean([x < 0.5 for x in preds_[i]])
-            accus[i] = np.mean([x[i] >= 0.5 for x in preds_[i]])
-            cnt += accus[i] * self.embs[i].num_embeddings
-            logger.info("Discriminator %s accuracy: %.5f", self.params.langs[i], accus[i])
-        dis_accu = cnt/total
-        logger.info("Discriminator global accuracy: %.5f", dis_accu)
+            for j in range(langnum):
+                logger.info("Discriminator true %s pred %s: %.5f", self.params.langs[i], self.params.langs[j], confusion_matrix[i][j]/sum(confusion_matrix[i]))
+        dis_accu = sum(a[i] for i, a in enumerate(confusion_matrix))/sum(sum(a) for a in confusion_matrix)
 
+        logger.info("Discriminator global accuracy: %.5f", dis_accu)
         to_log['dis_accu'] = dis_accu
         # to_log['dis_src_pred'] = pred
         # to_log['dis_tgt_pred'] = pred
