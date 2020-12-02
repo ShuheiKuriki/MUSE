@@ -67,14 +67,15 @@ class Trainer():
         langnum = self.langnum
         assert mf <= min(map(len, self.dicos))
 
-        #get ids
+        # get ids
         ids = [0]*langnum
-        for i in range(langnum-1):
-            ids[i] = torch.arange(1, bs+1, dtype=torch.int64) if self.params.test else torch.LongTensor(bs).random_(mf)
-        if rv:
-            ids[-1] = torch.LongTensor(bs).random_(rv)
-        else:
-            ids[-1] = torch.arange(1, bs+1, dtype=torch.int64) if self.params.test else torch.LongTensor(bs).random_(mf)
+        for i in range(langnum):
+            if self.params.test:
+                ids[i] = torch.arange(0, bs, dtype=torch.int64)
+            elif rv and i == langnum-1:
+                ids[i] = torch.LongTensor(bs).random_(rv)
+            else:
+                ids[i] = torch.LongTensor(bs).random_(mf)
         if self.params.cuda:
             for i in range(self.langnum):
                 ids[i] = ids[i].cuda()
@@ -87,10 +88,11 @@ class Trainer():
         if not rv:
             embs[-1] = embs[-1].detach()
 
-        if self.params.test:
-            for i in range(langnum):
-                logger.info(i)
-                logger.info(self.embs[i].weight.detach()[0, :10])
+        # if self.params.test:
+            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.generator.mappings[1].weight)))
+            # if isinstance(self.embs[2].weight.grad, torch.Tensor):
+                # logger.info(self.embs[2].weight.grad.size())
+                # logger.info(self.embs[2].weight.grad)
 
         # input / target
         x = torch.cat(embs, 0)
@@ -113,8 +115,8 @@ class Trainer():
         # loss
         x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
-        # if self.params.test:
-            # logger.info('dis_start')
+        if self.params.test:
+            logger.info('dis_start')
             # logger.info(torch.exp(preds[:10]))
             # logger.info(self.generator.mappings[0].weight[0][:10])
 
@@ -132,12 +134,16 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
 
+        if self.params.test and isinstance(self.embs[2].weight.grad, torch.Tensor):
+            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.detach()[0])))
+            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.grad[0])))
+
         self.discriminator.eval()
         new_preds = self.discriminator(x.detach())
         new_loss = torch.mean(torch.sum(-y*new_preds, dim=1))
         stats['DIS_COSTS'].append(new_loss.detach().item())
-        # if self.params.test:
-            # logger.info('after_dis')
+        if self.params.test:
+            logger.info('after_dis')
             # logger.info(torch.exp(new_preds[:10]))
             # logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             # logger.info(self.generator.mappings[0].weight[0][:10])
@@ -153,8 +159,8 @@ class Trainer():
         x, y = self.get_dis_xy()
         # logger.info(torch.mean(torch.norm(self.embs[-1].weight.detach(), dim=1)))
         preds = self.discriminator(x)
-        # if self.params.test:
-        #     logger.info('gen_start')
+        if self.params.test:
+            logger.info('gen_start')
         #     logger.info(torch.exp(preds[:10]))
         #     logger.info(self.generator.mappings[0].weight[0][:10])
 
@@ -170,20 +176,23 @@ class Trainer():
         torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         loss.backward()
         self.gen_optimizer.step()
+        if self.params.test:
+            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.detach()[0])))
+            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.grad[0])))
 
         new_x, new_y = self.get_dis_xy()
         new_preds = self.discriminator(new_x.detach())
         new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
         stats['MAP_COSTS'].append(new_loss.detach().item())
-        # if self.params.test:
-        #     logger.info('after_gen')
+        if self.params.test:
+            logger.info('after_gen')
         #     logger.info(torch.exp(new_preds[:10]))
         #     logger.info(self.generator.mappings[0].weight.grad[0][:10])
         #     logger.info(self.generator.mappings[0].weight[0][:10])
         #     logger.info('Mapping loss %.4f', new_loss)
         self.generator.orthogonalize()
-        # if self.params.test:
-        #     logger.info('orthogonalized')
+        if self.params.test:
+            logger.info('orthogonalized')
         #     x, y = self.get_dis_xy()
         #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
         #     logger.info(self.generator.mappings[0].weight[0][:10])
