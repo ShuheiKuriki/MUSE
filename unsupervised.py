@@ -116,6 +116,7 @@ if params.adversarial:
         tic = time.time()
         n_words_proc = 0
         stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
+        stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
 
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
@@ -128,8 +129,9 @@ if params.adversarial:
 
             # log stats
             if n_iter % 500 == 0:
-                stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+                if params.random_vocab:
+                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)

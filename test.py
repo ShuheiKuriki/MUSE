@@ -32,6 +32,7 @@ parser.add_argument("--exp_path", type=str, default="", help="Where to store exp
 parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
+parser.add_argument("--device", type=int, default=0, help="select cuda device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -60,7 +61,7 @@ parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy 
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-parser.add_argument("--truncated", type=float, default=50, help="initialize embeddings as truncated normal distribution")
+parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -103,13 +104,15 @@ evaluator = Evaluator(trainer)
 logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
 stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-# discriminator training
 stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
+# discriminator training
 for _ in range(params.test_epochs):
     trainer.dis_step(stats)
 # mapping training (discriminator fooling)
     trainer.gen_step(stats)
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+if params.random_vocab:
+    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
 stats_log = ' - '.join(stats_log)
 logger.info(stats_log)
