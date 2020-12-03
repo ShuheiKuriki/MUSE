@@ -130,8 +130,8 @@ class Trainer():
 
         # optim
         self.dis_optimizer.zero_grad()
-        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         self.dis_optimizer.step()
 
         if self.params.test and isinstance(self.embs[2].weight.grad, torch.Tensor):
@@ -173,8 +173,8 @@ class Trainer():
 
         # optim
         self.gen_optimizer.zero_grad()
-        torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         self.gen_optimizer.step()
         if self.params.test:
             logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.detach()[0])))

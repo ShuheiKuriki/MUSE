@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
         return output
 
 class Generator(nn.Module):
-    """mapping"""
+    """mapping and embeddings"""
 
     def __init__(self, params):
         super(Generator, self).__init__()
@@ -67,13 +67,13 @@ class Generator(nn.Module):
             # _embs[i] /= _embs[i].norm(2, 1, keepdim=True).expand_as(_embs[i])
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(params.langnum):
-            self.embs[i].weight.detach().copy_(_embs[i])
+            self.embs[i].weight.data = _embs[i]*50
         params.dicos = dicos
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
-                self.mappings[i].weight.detach().copy_(torch.diag(torch.ones(self.emb_dim)))
+                self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
 
     def forward(self, x, i):
         """map into target space"""
@@ -85,10 +85,9 @@ class Generator(nn.Module):
         Orthogonalize the mapping.
         """
         beta = self.map_beta
-        if beta > 0:
-            for i in range(self.langnum-1):
-                W = self.mappings[i].weight.detach()
-                W.copy_((1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W)))
+        for i in range(self.langnum-1):
+            W = self.mappings[i].weight.detach()
+            self.mappings[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
 
 def build_model(params):
     """
