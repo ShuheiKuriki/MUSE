@@ -85,7 +85,7 @@ class Trainer():
         for i in range(langnum-1):
             embs[i] = self.generator(self.embs[i](ids[i]).detach(), i)
         embs[-1] = self.embs[-1](ids[-1])
-        if not rv:
+        if (not rv) or (not self.params.learnable):
             embs[-1] = embs[-1].detach()
 
         # if self.params.test:
@@ -134,9 +134,10 @@ class Trainer():
         torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         self.dis_optimizer.step()
 
-        if self.params.test and isinstance(self.embs[2].weight.grad, torch.Tensor):
-            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.detach()[0])))
-            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.grad[0])))
+        if self.params.test:
+            for i in range(self.langnum):
+                logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
+                    # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
 
         self.discriminator.eval()
         new_preds = self.discriminator(x.detach())
@@ -177,8 +178,8 @@ class Trainer():
         torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
         self.gen_optimizer.step()
         if self.params.test:
-            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.detach()[0])))
-            logger.info('%.15f', torch.mean(torch.abs(self.embs[2].weight.grad[0])))
+            for i in range(self.langnum):
+                logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
 
         new_x, new_y = self.get_dis_xy()
         new_preds = self.discriminator(new_x.detach())

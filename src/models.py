@@ -66,8 +66,8 @@ class Generator(nn.Module):
                 dicos[i], _embs[i] = load_embeddings(params, i)
             # _embs[i] /= _embs[i].norm(2, 1, keepdim=True).expand_as(_embs[i])
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
-        for i in range(params.langnum):
-            self.embs[i].weight.data = _embs[i]*50
+        for i in range(self.langnum):
+            self.embs[i].weight.data = _embs[i]*params.multiply
         params.dicos = dicos
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
