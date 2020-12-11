@@ -59,20 +59,23 @@ class Generator(nn.Module):
             if i == params.langnum-1 and params.random_vocab:
                 dicos[-1] = [0]*params.random_vocab
                 if params.truncated:
-                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim]))
+                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float()
                 else:
                     _embs[-1] = torch.randn(params.random_vocab, params.emb_dim)
+                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))*params.random_norm
             else:
                 dicos[i], _embs[i] = load_embeddings(params, i)
             # _embs[i] /= _embs[i].norm(2, 1, keepdim=True).expand_as(_embs[i])
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(self.langnum):
-            self.embs[i].weight.data = _embs[i]*params.multiply
+            self.embs[i].weight.data = _embs[i]
+            self.embs[i].weight.requires_grad = False
         params.dicos = dicos
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
+                # self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
                 self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
 
     def forward(self, x, i):

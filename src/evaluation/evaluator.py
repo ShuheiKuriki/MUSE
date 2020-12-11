@@ -214,7 +214,7 @@ class Evaluator:
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i)
-            if self.params.random_vocab:
+            if self.params.random_vocab or self.generator.embs[-1].weight.requires_grad:
                 for j in range(self.langnum-1):
                     if i == j:
                         continue
