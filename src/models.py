@@ -59,13 +59,15 @@ class Generator(nn.Module):
             if i == params.langnum-1 and params.random_vocab:
                 dicos[-1] = [0]*params.random_vocab
                 if params.truncated:
-                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float()
+                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float().cuda()
                 else:
-                    _embs[-1] = torch.randn(params.random_vocab, params.emb_dim)
-                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))*params.random_norm
+                    _embs[-1] = torch.randn(params.random_vocab, params.emb_dim).cuda()
+                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))
+                norm_mean = torch.mean(torch.cat([torch.norm(_embs[l], dim=1, keepdim=True).expand_as(_embs[l]) for l in range(params.langnum-1)]).view(params.langnum-1, -1, params.emb_dim), dim=0)
+                print(norm_mean)
+                _embs[-1] *= norm_mean[:params.random_vocab]*1.6
             else:
                 dicos[i], _embs[i] = load_embeddings(params, i)
-            # _embs[i] /= _embs[i].norm(2, 1, keepdim=True).expand_as(_embs[i])
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(self.langnum):
             self.embs[i].weight.data = _embs[i]
