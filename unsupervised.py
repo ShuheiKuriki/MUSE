@@ -90,7 +90,7 @@ assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
-params.metric_size = params.random_vocab if params.random_vocab else 10000
+params.metric_size = 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
