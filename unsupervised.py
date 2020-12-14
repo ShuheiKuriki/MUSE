@@ -46,7 +46,8 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=0.3, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling2", type=float, default=0, help="probality of learning embeddings")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
@@ -59,6 +60,7 @@ parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Gen
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
+parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution(0 to disable)")
@@ -84,7 +86,6 @@ assert not params.cuda or torch.cuda.is_available()
 assert 0 <= params.dis_dropout < 1
 assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
-assert 0 < params.dis_sampling <= 1
 assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
@@ -93,15 +94,16 @@ params.metric_size = params.random_vocab if params.random_vocab else 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
-logger = initialize_exp(params)
 params.test = False
 params.langs = params.langs.split('_')
 if params.random_vocab:
     params.langs.append('random')
+    params.lr_shrink = 0.9
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+logger = initialize_exp(params)
 generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)
 evaluator = Evaluator(trainer)
@@ -114,6 +116,12 @@ if params.adversarial:
     # training loop
     for n_epoch in range(params.n_epochs):
 
+        trainer.generator.embs[-1].weight.requires_grad = False
+        for l in range(params.langnum-1):
+            trainer.generator.mappings[l].weight.requires_grad = True
+        trainer.gen_optimizer.param_groups[0]['lr'] = 0.1*pow(0.95,n_epoch)
+        params.epoch_size = 500000
+
         logger.info('Starting adversarial training epoch %i...', n_epoch)
         tic = time.time()
         n_words_proc = 0
@@ -123,8 +131,12 @@ if params.adversarial:
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
             # discriminator training
-            if np.random.rand() <= params.dis_sampling:
-                trainer.dis_step(stats)
+            if params.dis_sampling < 1:
+                if np.random.rand() <= params.dis_sampling:
+                    trainer.dis_step(stats)
+            else:
+                for i in range(int(params.dis_sampling)):
+                    trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats)
@@ -165,16 +177,11 @@ if params.adversarial:
             logger.info('Learning rate < 1e-6. BREAK.')
             break
 
-    logger.info('The best metric is %.4f', trainer.best_valid_metric)
-    
-    trainer.reload_best()
-    trainer.generator.embs[-1].weight[:1000].requires_grad = True
-    for l in range(params.langnum-1):
-        trainer.generator.mappings[l].weight.requires_grad = False
-    trainer.gen_optimizer.param_groups[0]['lr'] = params.emb_lr
-    params.epoch_size = 100000
-
-    for n_epoch in range(params.n_epochs):
+        trainer.generator.embs[-1].weight.requires_grad = True
+        for l in range(params.langnum-1):
+            trainer.generator.mappings[l].weight.requires_grad = False
+        trainer.gen_optimizer.param_groups[0]['lr'] = params.emb_lr*pow(0.95,n_epoch)
+        params.epoch_size = 100000
 
         logger.info('Starting embedding training epoch %i...', n_epoch)
         tic = time.time()
@@ -227,7 +234,7 @@ if params.adversarial:
             break
 
     logger.info('The best metric is %.4f', trainer.best_valid_metric)
-    
+
 # Learning loop for Procrustes Iterative Refinement
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
