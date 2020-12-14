@@ -103,19 +103,21 @@ generator, discriminator = build_model(params)
 trainer = Trainer(generator, discriminator, params)
 evaluator = Evaluator(trainer)
 
-# Learning loop for Adversarial Training
-logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+for i in range(params.langnum):
+    torch.save(torch.norm(generator.embs[i].weight, dim=1), '{}.pt'.format(params.langs[i]))
+# # Learning loop for Adversarial Training
+# logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
-stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-# discriminator training
-for _ in range(params.test_epochs):
-    trainer.dis_step(stats)
-# mapping training (discriminator fooling)
-    trainer.gen_step(stats)
+# stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
+# stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
+# # discriminator training
+# for _ in range(params.test_epochs):
+#     trainer.dis_step(stats)
+# # mapping training (discriminator fooling)
+#     trainer.gen_step(stats)
 
-stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-if params.random_vocab:
-    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
-stats_log = ' - '.join(stats_log)
-logger.info(stats_log)
+# stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+# if params.random_vocab:
+#     stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
+# stats_log = ' - '.join(stats_log)
+# logger.info(stats_log)
