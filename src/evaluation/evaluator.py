@@ -205,7 +205,7 @@ class Evaluator:
             else:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = [mean_cosine]
 
-    def all_eval(self, to_log):
+    def all_eval(self, to_log, all_pair=False):
         """
         Run all evaluations.
         """
@@ -213,8 +213,16 @@ class Evaluator:
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i)
-            if self.params.random_vocab or self.mapping.embs[-1].weight.requires_grad:
+            if self.params.random_vocab or self.params.learnable:
                 for j in range(self.langnum-1):
+                    if i == j:
+                        continue
+                    logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
+                    self.crosslingual_wordsim(i, j, to_log)
+                    self.word_translation(i, j, to_log)
+                    # self.sent_translation(i, j, to_log)
+            elif all_pair:
+                for j in range(self.langnum):
                     if i == j:
                         continue
                     logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])

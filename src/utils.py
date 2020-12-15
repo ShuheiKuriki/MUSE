@@ -68,6 +68,8 @@ def initialize_exp(params):
     logger.info('\n'.join('%s: %s' % (k, str(v)) for k, v in sorted(dict(vars(params)).items())))
     logger.info('The experiment will be stored in %s', params.exp_path)
     logger.info('current device is %s', params.device)
+    if params.device != 'cpu':
+        torch.cuda.set_device(int(params.device[-1]))
     return logger
 
 

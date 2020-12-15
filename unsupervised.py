@@ -45,8 +45,7 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
-parser.add_argument("--dis_sampling2", type=float, default=0, help="probality of learning embeddings")
+parser.add_argument("--dis_sampling", type=float, default=0.3, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
@@ -64,7 +63,7 @@ parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution(0 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=0, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -95,9 +94,10 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # build model / trainer / evaluator
 params.test = False
 params.langs = params.langs.split('_')
-if params.random_vocab:
-    params.langs.append('random')
+if params.langs[-1] == 'random':
     params.lr_shrink = 0.8
+else:
+    params.random_vocab = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -139,8 +139,8 @@ if params.adversarial:
             # log stats
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                if params.random_vocab:
-                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
+                if params.learnable:
+                    stats_log.append('Target emb Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
@@ -178,31 +178,32 @@ if params.adversarial:
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-    trainer.reload_best()
+    if not params.random_vocab:
+        trainer.reload_best()
 
     # training loop
     for n_iter in range(params.n_refinement):
 
         logger.info('Starting refinement iteration %i...', n_iter)
 
-    # build a dictionary from aligned embeddings
-    trainer.build_dictionary()
+        # build a dictionary from aligned embeddings
+        trainer.build_dictionary()
 
-    # apply the Procrustes solution
-    trainer.procrustes()
+        # apply the Procrustes solution
+        trainer.procrustes()
 
-    # embeddings evaluation
-    to_log = OrderedDict({'n_iter': n_iter})
-    evaluator.all_eval(to_log)
+        # embeddings evaluation
+        to_log = OrderedDict({'n_iter': n_iter})
+        evaluator.all_eval(to_log)
 
-    # JSON log / save best model / end of epoch
-    # logger.info("__log__:%s", json.dumps(to_log))
-    trainer.save_best(to_log, VALIDATION_METRIC)
-    logger.info('End of refinement iteration %i.\n\n', n_iter)
+        # JSON log / save best model / end of epoch
+        # logger.info("__log__:%s", json.dumps(to_log))
+        trainer.save_best(to_log, VALIDATION_METRIC)
+        logger.info('End of refinement iteration %i.\n\n', n_iter)
 
 to_log = OrderedDict()
 trainer.reload_best()
-evaluator.all_eval(to_log)
+evaluator.all_eval(to_log, all_pair=True)
 logger.info('end of the examination')
 # export embeddings
 # if params.export:

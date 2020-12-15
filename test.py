@@ -92,8 +92,10 @@ assert params.export in ["", "txt", "pth"]
 # build model / trainer / evaluator
 params.test = True
 params.langs = params.langs.split('_')
-if params.random_vocab:
-    params.langs.append('random')
+if params.langs[-1] == 'random':
+    params.lr_shrink = 0.8
+else:
+    params.random_vocab = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -105,7 +107,7 @@ trainer = Trainer(mapping, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
 
 # for i in range(params.langnum):
-    # torch.save(torch.norm(embs[i].weight, dim=1), 'data/emb_norms/{}.pt'.format(params.langs[i]))
+    # torch.save(torch.norm(embedding.embs[i].weight, dim=1), 'data/emb_norms/{}.pt'.format(params.langs[i]))
 
 # Learning loop for Adversarial Training
 logger.info('----> ADVERSARIAL TRAINING <----\n\n')
