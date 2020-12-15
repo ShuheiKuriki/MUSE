@@ -91,9 +91,8 @@ class Trainer():
                 ids[i] = torch.LongTensor(bs).random_(rv)
             else:
                 ids[i] = torch.LongTensor(bs).random_(mf)
-        if self.params.cuda:
-            for i in range(self.langnum):
-                ids[i] = ids[i].cuda()
+        for i in range(self.langnum):
+            ids[i] = ids[i].to(self.params.device)
 
         # get word embeddings
         embs = [0]*langnum
@@ -101,7 +100,7 @@ class Trainer():
             embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
-            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.generator.mappings[1].weight)))
+            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.mappings[1].weight)))
             # if isinstance(self.embs[2].weight.grad, torch.Tensor):
                 # logger.info(self.embs[2].weight.grad.size())
                 # logger.info(self.embs[2].weight.grad)
@@ -114,7 +113,7 @@ class Trainer():
         for i in range(langnum):
             y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
 
-        y = y.cuda() if self.params.cuda else y
+        y = y.to(self.params.device)
 
         return x, y
 
@@ -240,8 +239,7 @@ class Trainer():
             self.dico = load_dictionary(dico_train, word2id1, word2id2)
 
         # cuda
-        if self.params.cuda:
-            self.dico = self.dico.cuda()
+        self.dico = self.dico.to(self.params.device)
 
     def build_dictionary(self):
         """
@@ -252,7 +250,7 @@ class Trainer():
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
         for i in range(self.langnum - 1):
-            src_emb = self.generator(self.embs[i].weight, i).detach()
+            src_emb = self.mapping(self.embs[i].weight, i).detach()
             src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
             self._dicos[i] = build_dictionary(src_emb, tgt_emb, self.params)
 
@@ -264,7 +262,7 @@ class Trainer():
         for i in range(self.langnum - 1):
             A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
             B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
-            W = self.generator.mappings[i].weight.detach()
+            W = self.mapping.mappings[i].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -273,21 +271,26 @@ class Trainer():
         """
         Update learning rate when using SGD.
         """
-        if 'sgd' not in self.params.gen_optimizer:
+        if 'sgd' not in self.params.map_optimizer:
             return
-        old_lr = self.gen_optimizer.param_groups[0]['lr']
-        new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
-        if new_lr < old_lr:
-            logger.info("Decreasing learning rate: %.8f -> %.8f", old_lr, new_lr)
-            self.gen_optimizer.param_groups[0]['lr'] = new_lr
+        old_maplr = self.map_optimizer.param_groups[0]['lr']
+        new_maplr = max(self.params.min_lr, old_maplr * self.params.lr_decay)
+        old_emblr = self.emb_optimizer.param_groups[0]['lr']
+        new_emblr = max(self.params.min_lr, old_emblr * self.params.lr_decay)
+        if new_maplr < old_maplr:
+            logger.info("Decreasing learning rate: map %.8f -> %.8f emb %.8f -> %.8f", old_maplr, new_maplr, old_emblr, new_emblr)
+            self.map_optimizer.param_groups[0]['lr'] = new_maplr
+            self.emb_optimizer.param_groups[0]['lr'] = new_emblr
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
             if to_log[metric] < self.prev_metric:
                 logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
-                old_lr = self.gen_optimizer.param_groups[0]['lr']
-                self.gen_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                logger.info("Shrinking the learning rate: %.5f -> %.5f", old_lr, self.gen_optimizer.param_groups[0]['lr'])
+                old_maplr = self.map_optimizer.param_groups[0]['lr']
+                old_emblr = self.emb_optimizer.param_groups[0]['lr']
+                self.map_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                self.emb_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+                logger.info("Shrinking the learning rate: map %.5f -> %.5f emb %.5f -> %.5f", old_maplr, old_maplr*self.params.lr_shrink, old_emblr, old_emblr*self.params.lr_shrink)
                 self.decrease_lr = True
                 self.params.epoch_size = int(self.params.epoch_size * self.params.lr_shrink)
             else:
@@ -306,7 +309,7 @@ class Trainer():
             # save the generator
 
             for i in range(self.langnum-1):
-                W = self.generator.mappings[i].weight.detach().cpu().numpy()
+                W = self.mapping.mappings[i].weight.detach().cpu().numpy()
                 path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
                 logger.info('* Saving the generator to %s ...', path)
                 torch.save(W, path)
@@ -321,7 +324,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.generator.mappings[i].weight.detach()
+            W = self.mapping.mappings[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -348,8 +351,8 @@ class Trainer():
     #     for j in range(params.langnum-1):
     #         for i, k in enumerate(range(0, len(embs[j]), bs)):
     #             with torch.no_grad():
-    #                 x = embs[j][k:k + bs].cuda() if params.cuda else embs[j][k:k + bs]
-    #             embs[j][k:k + bs] = self.generator[j](x).detach().cpu()
+    #                 x = embs[j][k:k + bs].to(self.params.device)
+    #             embs[j][k:k + bs] = self.mapping[j](x).detach().cpu()
 
     #     # write embeddings to the disk
     #     export_embeddings(embs, params)

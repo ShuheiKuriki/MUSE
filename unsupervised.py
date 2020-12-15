@@ -37,7 +37,7 @@ parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimensio
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--multiply", type=float, default=1., help="multiply embeddings")
-parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
+parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -98,15 +98,15 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.random_vocab:
     params.langs.append('random')
-    params.lr_shrink = 0.9
+    params.lr_shrink = 0.8
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
 params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
-mappings, embs, discriminator = build_model(params)
-trainer = Trainer(mappings, embs, discriminator, params)
+mappings, embedding, discriminator = build_model(params)
+trainer = Trainer(mappings, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -141,7 +141,7 @@ if params.adversarial:
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
                 if params.random_vocab:
-                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embs[-1].weight, dim=1))))
+                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
