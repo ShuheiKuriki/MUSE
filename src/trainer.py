@@ -27,28 +27,43 @@ logger = getLogger()
 class Trainer():
     """train class"""
 
-    def __init__(self, generator, discriminator, params):
+    def __init__(self, mapping, embedding, discriminator, params):
         """
         Initialize trainer script.
         """
 
-        self.embs = generator.embs
+        self.embedding = embedding
+        self.embs = embedding.embs
         self.dicos = params.dicos
-        self.generator = generator
+        self.mapping = mapping
         self.discriminator = discriminator
         self.params = params
         self.langnum = self.params.langnum
         self._dicos = [0]*(self.langnum-1)
 
         # optimizers
-        if hasattr(params, 'gen_optimizer'):
-            optim_fn, optim_params = get_optimizer(params.gen_optimizer)
-            self.gen_optimizer = optim_fn(generator.parameters(), **optim_params)
+        if hasattr(params, 'map_optimizer'):
+            optim_fn, optim_params = get_optimizer(params.map_optimizer)
+            self.map_optimizer = optim_fn(mapping.parameters(), **optim_params)
+        if hasattr(params, 'emb_optimizer'):
+            optim_fn, optim_params = get_optimizer(params.emb_optimizer)
+            self.emb_optimizer = optim_fn(embedding.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
         else:
             assert discriminator is None
+
+        if params.test:
+            logger.info('mapping')
+            for param in mapping.parameters():
+                logger.info(param.size())
+            logger.info('embedding')
+            for param in embedding.parameters():
+                logger.info(param.size())
+            logger.info('discriminator')
+            for param in discriminator.parameters():
+                logger.info(param.size())
 
         # best validation score
         self.prev_metric = -1e12
@@ -82,11 +97,8 @@ class Trainer():
 
         # get word embeddings
         embs = [0]*langnum
-        for i in range(langnum-1):
-            embs[i] = self.generator(self.embs[i](ids[i]).detach(), i)
-        embs[-1] = self.embs[-1](ids[-1])
-        if (not rv) or (not self.params.learnable):
-            embs[-1] = embs[-1].detach()
+        for i in range(langnum):
+            embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.generator.mappings[1].weight)))
@@ -114,11 +126,11 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        preds = self.discriminator(x.detach())
+        preds = self.discriminator(x)
         if self.params.test:
             logger.info('dis_start')
             # logger.info(torch.exp(preds[:10]))
-            # logger.info(self.generator.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.mappings[0].weight[0][:10])
 
         # cross_entropyの場合
         loss = torch.mean(torch.sum(-y*preds, dim=1))
@@ -128,6 +140,8 @@ class Trainer():
             logger.error("NaN detected (discriminator)")
             sys.exit()
 
+        stats['DIS_COSTS'].append(loss.detach().item())
+
         # optim
         self.dis_optimizer.zero_grad()
         loss.backward()
@@ -135,22 +149,17 @@ class Trainer():
         self.dis_optimizer.step()
 
         if self.params.test:
-            for i in range(self.langnum):
-                logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
-                    # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
-
-        self.discriminator.eval()
-        new_preds = self.discriminator(x.detach())
-        new_loss = torch.mean(torch.sum(-y*new_preds, dim=1))
-        stats['DIS_COSTS'].append(new_loss.detach().item())
-        if self.params.test:
             logger.info('after_dis')
+            # for i in range(self.langnum):
+                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
+                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
             # logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.discriminator.layers[1].weight.grad[0][:10])
-            # logger.info(self.generator.mappings[0].weight[0][:10])
+            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            # print(torch.norm(self.discriminator.layers[1].weight))
+            # logger.info(self.mapping.mappings[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
 
-    def gen_step(self, stats):
+    def gen_step(self, stats, mode='map'):
         """
         Fooling discriminator training step.
         """
@@ -161,9 +170,9 @@ class Trainer():
         # logger.info(torch.mean(torch.norm(self.embs[-1].weight.detach(), dim=1)))
         preds = self.discriminator(x)
         if self.params.test:
-            logger.info('gen_start')
+            logger.info('%s_start', mode)
         #     logger.info(torch.exp(preds[:10]))
-        #     logger.info(self.generator.mappings[0].weight[0][:10])
+        #     logger.info(self.mapping.mappings[0].weight[0][:10])
 
         loss = torch.mean(torch.sum(-(self.params.entropy_coef/self.langnum-y)*preds, dim=1))
 
@@ -173,30 +182,39 @@ class Trainer():
             sys.exit()
 
         # optim
-        self.gen_optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.params.clip_grad)
-        self.gen_optimizer.step()
-        if self.params.test:
-            for i in range(self.langnum):
-                logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
+        if mode == 'map':
+            self.map_optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
+            self.map_optimizer.step()
+        elif mode == 'emb':
+            self.emb_optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
+            self.emb_optimizer.step()
 
-        new_x, new_y = self.get_dis_xy()
-        new_preds = self.discriminator(new_x.detach())
-        new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
-        stats['MAP_COSTS'].append(new_loss.detach().item())
+
+        # new_x, new_y = self.get_dis_xy()
+        # new_preds = self.discriminator(new_x.detach())
+        # new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
+        # stats['MAP_COSTS'].append(new_loss.detach().item())
         if self.params.test:
-            logger.info('after_gen')
+            logger.info('after_%s', mode)
+            # print(torch.norm(self.discriminator.layers[1].weight))
+            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            # for i in range(self.langnum):
+                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
         #     logger.info(torch.exp(new_preds[:10]))
-        #     logger.info(self.generator.mappings[0].weight.grad[0][:10])
-        #     logger.info(self.generator.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.mappings[0].weight.grad[0][:10])
+            # logger.info(self.mapping.mappings[0].weight[0][:10])
         #     logger.info('Mapping loss %.4f', new_loss)
-        self.generator.orthogonalize()
-        if self.params.test:
-            logger.info('orthogonalized')
-        #     x, y = self.get_dis_xy()
-        #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
-        #     logger.info(self.generator.mappings[0].weight[0][:10])
+        if mode == 'map':
+            self.mapping.orthogonalize()
+            if self.params.test:
+                logger.info('orthogonalized')
+            #     x, y = self.get_dis_xy()
+            #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
+                # logger.info(self.mapping.mappings[0].weight[0][:10])
 
         return self.langnum * self.params.batch_size
 

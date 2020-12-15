@@ -56,11 +56,11 @@ parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adv
 parser.add_argument("--n_epochs", type=int, default=15, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
+parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
+parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
-parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution(0 to disable)")
@@ -103,9 +103,10 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
-generator, discriminator = build_model(params)
-trainer = Trainer(generator, discriminator, params)
+mappings, embs, discriminator = build_model(params)
+trainer = Trainer(mappings, embs, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -116,17 +117,11 @@ if params.adversarial:
     # training loop
     for n_epoch in range(params.n_epochs):
 
-        trainer.generator.embs[-1].weight.requires_grad = False
-        for l in range(params.langnum-1):
-            trainer.generator.mappings[l].weight.requires_grad = True
-        trainer.gen_optimizer.param_groups[0]['lr'] = 0.1*pow(0.95,n_epoch)
-        params.epoch_size = 500000
-
         logger.info('Starting adversarial training epoch %i...', n_epoch)
         tic = time.time()
         n_words_proc = 0
-        stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-        stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
+        stats = {'DIS_COSTS': []}
+        stats_str = [('DIS_COSTS', 'Discriminator loss')]
 
         for n_iter in range(0, params.epoch_size, params.batch_size):
 
@@ -139,13 +134,14 @@ if params.adversarial:
                     trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats)
+            n_words_proc += trainer.gen_step(stats, mode='map')
+            trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
                 if params.random_vocab:
-                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
+                    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embs[-1].weight, dim=1))))
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
@@ -173,65 +169,9 @@ if params.adversarial:
         # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
         # logger.info('Learning failed')
         # break
-        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
-            logger.info('Learning rate < 1e-6. BREAK.')
-            break
-
-        trainer.generator.embs[-1].weight.requires_grad = True
-        for l in range(params.langnum-1):
-            trainer.generator.mappings[l].weight.requires_grad = False
-        trainer.gen_optimizer.param_groups[0]['lr'] = params.emb_lr*pow(0.95,n_epoch)
-        params.epoch_size = 100000
-
-        logger.info('Starting embedding training epoch %i...', n_epoch)
-        tic = time.time()
-        n_words_proc = 0
-        stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-        stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-        for n_iter in range(0, params.epoch_size, params.batch_size):
-
-            # discriminator training
-            if np.random.rand() <= params.dis_sampling2:
-                trainer.dis_step(stats)
-
-            # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats)
-
-            # log stats
-            if n_iter % 500 == 0:
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                stats_log.append('Embedding Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
-                print(torch.mean(torch.norm(generator.embs[-1].weight.grad, dim=1)))
-                stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-                stats_log = ' - '.join(stats_log)
-                logger.info('%06i - %s', n_iter, stats_log)
-
-                # reset
-                tic = time.time()
-                n_words_proc = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
-
-        # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch})
-        evaluator.all_eval(to_log)
-        evaluator.eval_dis(to_log)
-
-        # save best model / end of epoch
-        trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of epoch %i.\n\n', n_epoch)
-
-        # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
-        # if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
-        # logger.info('We got the best metric.')
-        # break
-        # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
-        # logger.info('Learning failed')
-        # break
-        if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
-            logger.info('Learning rate < 1e-6. BREAK.')
-            break
+        # if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
+            # logger.info('Learning rate < 1e-6. BREAK.')
+            # break
 
     logger.info('The best metric is %.4f', trainer.best_valid_metric)
 

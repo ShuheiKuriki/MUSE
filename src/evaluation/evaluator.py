@@ -33,8 +33,9 @@ class Evaluator:
         Initialize evaluator.
         """
         self.embs = trainer.embs
+        self.embedding = trainer.embedding
         self.dicos = trainer.dicos
-        self.generator = trainer.generator
+        self.mapping = trainer.mapping
         self.discriminator = trainer.discriminator
         self.params = trainer.params
         self.langnum = self.params.langnum
@@ -45,9 +46,7 @@ class Evaluator:
         Evaluation on monolingual word similarity.
         """
         emb = self.embs[i].weight.detach()
-        ws_scores = get_wordsim_scores(
-            self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy()
-        )
+        ws_scores = get_wordsim_scores(self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy())
         if ws_scores is not None:
             ws_monolingual_scores = np.mean(list(ws_scores.values()))
             logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
@@ -82,8 +81,8 @@ class Evaluator:
         """
         Evaluation on cross-lingual word similarity.
         """
-        src_emb = self.generator(self.embs[i].weight.detach(), i)
-        tgt_emb = self.generator(self.embs[j].weight.detach(), j)
+        src_emb = self.mapping(self.embs[i].weight.detach(), i)
+        tgt_emb = self.mapping(self.embs[j].weight.detach(), j)
         src_emb = src_emb.detach().cpu().numpy()
         tgt_emb = tgt_emb.detach().cpu().numpy()
         # cross-lingual wordsim evaluation
@@ -107,8 +106,8 @@ class Evaluator:
         Evaluation on word translation.
         """
         # mapped word embeddings
-        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
             # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
@@ -142,8 +141,8 @@ class Evaluator:
             return
 
         # mapped word embeddings
-        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         # get idf weights
         idf = get_idf(self.europarl_data, lg1, lg2, n_idf=n_idf)
 
@@ -174,8 +173,8 @@ class Evaluator:
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.generator(self.embs[i].weight.detach(), i).detach()
-        tgt_emb = self.generator(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
+        tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
@@ -210,11 +209,11 @@ class Evaluator:
         """
         Run all evaluations.
         """
-        self.generator.eval()
+        self.mapping.eval()
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
             self.monolingual_wordsim(i)
-            if self.params.random_vocab or self.generator.embs[-1].weight.requires_grad:
+            if self.params.random_vocab or self.mapping.embs[-1].weight.requires_grad:
                 for j in range(self.langnum-1):
                     if i == j:
                         continue
@@ -247,7 +246,7 @@ class Evaluator:
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
                 if i < langnum-1:
-                    preds = self.discriminator(self.generator.mappings[i](emb).detach())
+                    preds = self.discriminator(self.mapping.mappings[i](emb).detach())
                 else:
                     preds = self.discriminator(emb)
                 preds_[i].extend(torch.exp(preds).detach().cpu().tolist())

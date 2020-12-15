@@ -44,45 +44,23 @@ class Discriminator(nn.Module):
         output = self.layers(x).view(-1, self.params.langnum)
         return output
 
-class Generator(nn.Module):
+class Mapping(nn.Module):
     """mapping and embeddings"""
 
     def __init__(self, params):
-        super(Generator, self).__init__()
+        super(Mapping, self).__init__()
 
-        self.emb_dim = params.emb_dim
         self.map_beta = params.map_beta
         self.langnum = params.langnum
-
-        dicos, _embs = [0]*params.langnum, [0]*params.langnum
-        for i in range(params.langnum):
-            if i == params.langnum-1 and params.random_vocab:
-                dicos[-1] = [0]*params.random_vocab
-                if params.truncated:
-                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float().cuda()
-                else:
-                    _embs[-1] = torch.randn(params.random_vocab, params.emb_dim).cuda()
-                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))
-                norm_mean = torch.mean(torch.cat([torch.norm(_embs[l], dim=1, keepdim=True).expand_as(_embs[l]) for l in range(params.langnum-1)]).view(params.langnum-1, -1, params.emb_dim), dim=0)
-                print(norm_mean)
-                _embs[-1] *= norm_mean[:params.random_vocab]*1.6
-            else:
-                dicos[i], _embs[i] = load_embeddings(params, i)
-        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
-        for i in range(self.langnum):
-            self.embs[i].weight.data = _embs[i]
-            self.embs[i].weight.requires_grad = False
-        params.dicos = dicos
 
         self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
                 # self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
-                self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
+                self.mappings[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
     def forward(self, x, i):
         """map into target space"""
-        assert x.dim() == 2 and x.size(1) == self.emb_dim
         return self.mappings[i](x) if i < self.langnum-1 else x
 
     def orthogonalize(self):
@@ -94,20 +72,54 @@ class Generator(nn.Module):
             W = self.mappings[i].weight.detach()
             self.mappings[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
 
+class Embedding(nn.Module):
+    """mapping and embeddings"""
+
+    def __init__(self, params):
+        super(Embedding, self).__init__()
+
+        self.emb_dim = params.emb_dim
+        self.langnum = params.langnum
+
+        dicos, _embs = [0]*params.langnum, [0]*params.langnum
+        for i in range(params.langnum):
+            if i == params.langnum-1 and params.random_vocab:
+                dicos[-1] = [0]*params.random_vocab
+                if params.truncated:
+                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float()
+                else:
+                    _embs[-1] = torch.randn(params.random_vocab, params.emb_dim)
+                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))
+                norm_mean = torch.mean(torch.cat([torch.norm(_embs[l], dim=1, keepdim=True).expand_as(_embs[l]) for l in range(params.langnum-1)]).view(params.langnum-1, -1, params.emb_dim), dim=0)
+                print(norm_mean)
+                _embs[-1] *= norm_mean[:params.random_vocab]*1.6
+            else:
+                dicos[i], _embs[i] = load_embeddings(params, i)
+        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
+        for i in range(self.langnum):
+            self.embs[i].weight.data = _embs[i]
+            if i == self.langnum-1 and params.random_vocab and params.learnable:
+                self.embs[i].weight.requires_grad = True
+            else:
+                self.embs[i].weight.requires_grad = False
+        params.dicos = dicos
+
 def build_model(params):
     """
     Build all components of the model.
     """
-    generator = Generator(params)
+    mapping = Mapping(params)
+    embedding = Embedding(params)
 
     # discriminator
     discriminator = Discriminator(params)
     # cuda
     if params.cuda:
-        generator.cuda()
+        mapping.cuda()
+        embedding.cuda()
         discriminator.cuda()
 
     # normalize embeddings
-    params.means = [normalize_embeddings(generator.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
+    params.means = [normalize_embeddings(embedding.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
 
-    return generator, discriminator
+    return mapping, embedding, discriminator

@@ -58,8 +58,9 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-parser.add_argument("--gen_optimizer", type=str, default="sgd,lr=0.1", help="Generator optimizer")
+parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
+parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
@@ -90,7 +91,6 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
-logger = initialize_exp(params)
 params.test = True
 params.langs = params.langs.split('_')
 if params.random_vocab:
@@ -99,25 +99,29 @@ params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-generator, discriminator = build_model(params)
-trainer = Trainer(generator, discriminator, params)
+params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+logger = initialize_exp(params)
+mapping, embedding, discriminator = build_model(params)
+trainer = Trainer(mapping, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
 
-for i in range(params.langnum):
-    torch.save(torch.norm(generator.embs[i].weight, dim=1), '{}.pt'.format(params.langs[i]))
-# # Learning loop for Adversarial Training
-# logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+# for i in range(params.langnum):
+    # torch.save(torch.norm(embs[i].weight, dim=1), 'data/emb_norms/{}.pt'.format(params.langs[i]))
 
-# stats = {'DIS_COSTS': [], 'MAP_COSTS': []}
-# stats_str = [('DIS_COSTS', 'Discriminator loss'), ('MAP_COSTS', 'Mapping loss')]
-# # discriminator training
-# for _ in range(params.test_epochs):
-#     trainer.dis_step(stats)
-# # mapping training (discriminator fooling)
-#     trainer.gen_step(stats)
+# Learning loop for Adversarial Training
+logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
-# stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-# if params.random_vocab:
-#     stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(generator.embs[-1].weight, dim=1))))
-# stats_log = ' - '.join(stats_log)
-# logger.info(stats_log)
+stats = {'DIS_COSTS': []}
+stats_str = [('DIS_COSTS', 'Discriminator loss')]
+# discriminator training
+for _ in range(params.test_epochs):
+    trainer.dis_step(stats)
+# mapping training (discriminator fooling)
+    trainer.gen_step(stats, mode='map')
+    trainer.gen_step(stats, mode='emb')
+
+stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+if params.random_vocab:
+    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
+stats_log = ' - '.join(stats_log)
+logger.info(stats_log)

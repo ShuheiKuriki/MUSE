@@ -40,7 +40,7 @@ try:
                          "Switching to FAISS-CPU, "
                          "this will be slower.\n\n")
 
-except ImportError:
+except:
     sys.stderr.write("Impossible to import Faiss library!! "
                      "Switching to standard nearest neighbors search implementation, "
                      "this will be significantly slower.\n\n")
