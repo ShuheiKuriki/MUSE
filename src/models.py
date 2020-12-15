@@ -114,10 +114,9 @@ def build_model(params):
     # discriminator
     discriminator = Discriminator(params)
     # cuda
-    if params.cuda:
-        mapping.cuda()
-        embedding.cuda()
-        discriminator.cuda()
+    mapping.to(params.device)
+    embedding.to(params.device)
+    discriminator.to(params.device)
 
     # normalize embeddings
     params.means = [normalize_embeddings(embedding.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]

@@ -55,7 +55,7 @@ def initialize_exp(params):
     if getattr(params, 'seed', -1) >= 0:
         np.random.seed(params.seed)
         torch.manual_seed(params.seed)
-        if params.cuda:
+        if params.device != 'cpu':
             torch.cuda.manual_seed_all(params.seed)
     # dump parameters
     params.exp_path = get_exp_path(params)
@@ -67,9 +67,7 @@ def initialize_exp(params):
     logger.info('============ Initialized logger ============')
     logger.info('\n'.join('%s: %s' % (k, str(v)) for k, v in sorted(dict(vars(params)).items())))
     logger.info('The experiment will be stored in %s', params.exp_path)
-    if params.cuda:
-        torch.cuda.set_device(params.device)
-        logger.info('current device is %s', str(torch.cuda.current_device()))
+    logger.info('current device is %s', params.device)
     return logger
 
 
@@ -311,7 +309,6 @@ def read_txt_embeddings(params, emb_path, lang, full_vocab):
     dico = Dictionary(id2word, word2id, lang)
     embeddings = np.concatenate(vectors, 0)
     embeddings = torch.from_numpy(embeddings).float()
-    embeddings = embeddings.cuda() if (params.cuda and not full_vocab) else embeddings
 
     assert embeddings.size() == (len(dico), params.emb_dim)
     return dico, embeddings

@@ -31,8 +31,7 @@ parser.add_argument("--test_epochs", type=int, default=5, help="the number of te
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
 parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
-parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
-parser.add_argument("--device", type=int, default=0, help="select cuda device")
+parser.add_argument("--device", type=str, default='cuda:0', help="select device cpu or cuda:0,1,2,3")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -81,7 +80,7 @@ parser.add_argument("--normalize_embeddings", type=str, default="", help="Normal
 params = parser.parse_args()
 
 # check parameters
-assert not params.cuda or torch.cuda.is_available()
+assert params.device == 'cpu' or torch.cuda.is_available()
 assert 0 <= params.dis_dropout < 1
 assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
