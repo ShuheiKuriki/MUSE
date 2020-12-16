@@ -35,10 +35,12 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
-parser.add_argument("--multiply", type=float, default=1., help="multiply embeddings")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
+# random embedding
+parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
+parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -60,7 +62,6 @@ parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy 
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution(0 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -95,10 +96,11 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] == 'random':
     params.lr_shrink = 0.8
-    eval_type = 'no_target'
+    eval_type = last_eval = 'no_target'
 else:
     params.random_vocab = False
-if params.emb_lr:
+    last_eval = 'all'
+if not params.emb_lr:
     eval_type = 'only_target'
 params.langnum = len(params.langs)
 params.embpaths = []
@@ -205,7 +207,8 @@ if params.n_refinement:
 
 to_log = OrderedDict()
 trainer.reload_best()
-evaluator.all_eval(to_log, "all")
+evaluator.all_eval(to_log, last_eval)
+evaluator.eval_dis(to_log)
 logger.info('end of the examination')
 # export embeddings
 # if params.export:

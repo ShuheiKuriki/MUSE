@@ -85,14 +85,12 @@ class Embedding(nn.Module):
         for i in range(params.langnum):
             if i == params.langnum-1 and params.random_vocab:
                 dicos[-1] = [0]*params.random_vocab
-                if params.truncated:
-                    _embs[-1] = torch.from_numpy(truncnorm.rvs(-params.truncated, params.truncated, size=[params.random_vocab, params.emb_dim])).float()
-                else:
-                    _embs[-1] = torch.randn(params.random_vocab, params.emb_dim)
-                _embs[-1] = _embs[-1]/torch.mean(torch.norm(_embs[-1], dim=1))
-                norm_mean = torch.mean(torch.cat([torch.norm(_embs[l], dim=1, keepdim=True).expand_as(_embs[l]) for l in range(params.langnum-1)]).view(params.langnum-1, -1, params.emb_dim), dim=0)
-                print(norm_mean)
-                _embs[-1] *= norm_mean[:params.random_vocab]*1.6
+                _embs[-1] = torch.randn(params.random_vocab, params.emb_dim) / (params.emb_dim**.5)
+                if params.emb_init == 'norm_mean':
+                    norm_mean = torch.mean(torch.cat([torch.norm(_embs[l], dim=1, keepdim=True).expand_as(_embs[l]) for l in range(params.langnum-1)]).view(params.langnum-1, -1, params.emb_dim), dim=0)
+                    print(norm_mean)
+                    _embs[-1] *= norm_mean[:params.random_vocab] / torch.mean(torch.norm(norm_mean[:params.random_vocab], dim=1))
+                _embs[-1] *= params.emb_norm
             else:
                 dicos[i], _embs[i] = load_embeddings(params, i)
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
