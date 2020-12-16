@@ -36,7 +36,6 @@ parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimensio
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--multiply", type=float, default=1., help="multiply embeddings")
-parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -56,7 +55,7 @@ parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations p
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
-parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
+parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
@@ -96,8 +95,11 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] == 'random':
     params.lr_shrink = 0.8
+    eval_type = 'no_target'
 else:
     params.random_vocab = False
+if params.emb_lr:
+    eval_type = 'only_target'
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -139,7 +141,7 @@ if params.adversarial:
             # log stats
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                if params.learnable:
+                if params.emb_lr:
                     stats_log.append('Target emb Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
@@ -153,7 +155,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch})
-        evaluator.all_eval(to_log)
+        evaluator.all_eval(to_log, eval_type)
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -194,7 +196,7 @@ if params.n_refinement:
 
         # embeddings evaluation
         to_log = OrderedDict({'n_iter': n_iter})
-        evaluator.all_eval(to_log)
+        evaluator.all_eval(to_log, eval_type)
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))
@@ -203,7 +205,7 @@ if params.n_refinement:
 
 to_log = OrderedDict()
 trainer.reload_best()
-evaluator.all_eval(to_log, all_pair=True)
+evaluator.all_eval(to_log, "all")
 logger.info('end of the examination')
 # export embeddings
 # if params.export:

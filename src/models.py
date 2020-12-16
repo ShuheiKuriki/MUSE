@@ -98,7 +98,7 @@ class Embedding(nn.Module):
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(self.langnum):
             self.embs[i].weight.data = _embs[i]
-            if i == self.langnum-1 and params.learnable:
+            if i == self.langnum-1 and params.emb_lr:
                 self.embs[i].weight.requires_grad = True
             else:
                 self.embs[i].weight.requires_grad = False
