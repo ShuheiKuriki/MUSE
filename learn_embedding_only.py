@@ -54,7 +54,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
@@ -161,15 +161,6 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        # if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
-        # logger.info('We got the best metric.')
-        # break
-        # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
-        # logger.info('Learning failed')
-        # break
-        if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
-            logger.info('Learning rate < 1e-5. BREAK.')
-            break
 
     logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
