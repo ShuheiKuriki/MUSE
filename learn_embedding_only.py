@@ -53,7 +53,7 @@ parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator s
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
-parser.add_argument("--n_epochs", type=int, default=30, help="Number of epochs")
+parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
@@ -138,7 +138,8 @@ if params.adversarial:
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
                 if params.emb_lr:
-                    stats_log.append('Target emb Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
+                    tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                    stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
@@ -150,7 +151,7 @@ if params.adversarial:
                     del stats[k][:]
 
         # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch})
+        to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
         evaluator.all_eval(to_log, '')
         evaluator.eval_dis(to_log)
 
@@ -166,17 +167,17 @@ if params.adversarial:
         # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
         # logger.info('Learning failed')
         # break
-        # if trainer.gen_optimizer.param_groups[0]['lr'] < params.min_lr:
-            # logger.info('Learning rate < 1e-6. BREAK.')
-            # break
+        if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
+            logger.info('Learning rate < 1e-5. BREAK.')
+            break
 
-    logger.info('The best metric is %.4f', trainer.best_valid_metric)
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
-to_log = OrderedDict()
-trainer.reload_best()
-evaluator.all_eval(to_log, '')
-evaluator.eval_dis(to_log)
-logger.info('end of the examination')
+# to_log = OrderedDict()
+# trainer.reload_best()
+# evaluator.all_eval(to_log, '')
+# evaluator.eval_dis(to_log)
+# logger.info('end of the examination')
 # export embeddings
 # if params.export:
     # trainer.reload_best()

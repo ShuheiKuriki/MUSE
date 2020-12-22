@@ -292,7 +292,6 @@ class Trainer():
                 self.emb_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
                 logger.info("Shrinking the learning rate: map %.5f -> %.5f emb %.5f -> %.5f", old_maplr, old_maplr*self.params.lr_shrink, old_emblr, old_emblr*self.params.lr_shrink)
                 self.decrease_lr = True
-                self.params.epoch_size = int(self.params.epoch_size * self.params.lr_shrink)
             else:
                 logger.info("The validation metric is getting better")
             self.prev_metric = to_log[metric]
@@ -305,6 +304,8 @@ class Trainer():
         if to_log[metric] > self.best_valid_metric:
             # new best generator
             self.best_valid_metric = to_log[metric]
+            self.best_epoch = to_log["n_epoch"]
+            self.best_tgt_norm = to_log["tgt_norm"]
             logger.info('* Best value for "%s": %.5f', metric, to_log[metric])
             # save the generator
 
