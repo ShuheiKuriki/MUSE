@@ -273,24 +273,19 @@ class Trainer():
         """
         if 'sgd' not in self.params.map_optimizer:
             return
-        old_maplr = self.map_optimizer.param_groups[0]['lr']
-        new_maplr = max(self.params.min_lr, old_maplr * self.params.lr_decay)
-        old_emblr = self.emb_optimizer.param_groups[0]['lr']
-        new_emblr = max(self.params.min_lr, old_emblr * self.params.lr_decay)
-        if new_maplr < old_maplr:
-            logger.info("Decreasing learning rate: map %.8f -> %.8f emb %.8f -> %.8f", old_maplr, new_maplr, old_emblr, new_emblr)
-            self.map_optimizer.param_groups[0]['lr'] = new_maplr
-            self.emb_optimizer.param_groups[0]['lr'] = new_emblr
+        old_lr = self.map_optimizer.param_groups[0]['lr']
+        new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
+        if new_lr < old_lr:
+            logger.info("Decreasing learning rate: map %.8f -> %.8f ", old_lr, new_lr)
+            self.map_optimizer.param_groups[0]['lr'] = new_lr
         if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
             if to_log[metric] < self.prev_metric:
                 logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
                 # decrease the learning rate, only if this is the
                 # second time the validation metric decreases
-                old_maplr = self.map_optimizer.param_groups[0]['lr']
-                old_emblr = self.emb_optimizer.param_groups[0]['lr']
+                old_lr = self.map_optimizer.param_groups[0]['lr']
                 self.map_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                self.emb_optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                logger.info("Shrinking the learning rate: map %.5f -> %.5f emb %.5f -> %.5f", old_maplr, old_maplr*self.params.lr_shrink, old_emblr, old_emblr*self.params.lr_shrink)
+                logger.info("Shrinking the learning rate: map %.5f -> %.5f", old_lr, old_lr*self.params.lr_shrink)
                 self.decrease_lr = True
             else:
                 logger.info("The validation metric is getting better")
