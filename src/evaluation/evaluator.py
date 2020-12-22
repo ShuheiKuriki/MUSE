@@ -212,7 +212,6 @@ class Evaluator:
         self.mapping.eval()
         for i in range(self.langnum-1):
             logger.info('evaluate %s', self.params.langs[i])
-            self.monolingual_wordsim(i)
             if eval_type == 'no_target':
                 for j in range(self.langnum-1):
                     if i == j:
@@ -222,6 +221,7 @@ class Evaluator:
                     self.word_translation(i, j, to_log)
                     # self.sent_translation(i, j, to_log)
             elif eval_type == 'all':
+                self.monolingual_wordsim(i)
                 for j in range(self.langnum):
                     if i == j:
                         continue
