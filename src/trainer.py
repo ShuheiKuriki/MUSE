@@ -324,6 +324,20 @@ class Trainer():
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
+    def reload(self, folder):
+        """
+        Reload mappibgs from given folder.
+        """
+        for i in range(self.langnum-1):
+            path = os.path.join(folder, 'best_mapping{}.pth'.format(i+1))
+            logger.info('* Reloading the model from %s ...', path)
+            # reload the model
+            assert os.path.isfile(path)
+            to_reload = torch.from_numpy(torch.load(path))
+            W = self.mapping.mappings[i].weight.detach()
+            assert to_reload.size() == W.size()
+            W.copy_(to_reload.type_as(W))
+
     # def export(self):
     #     """
     #     Export embeddings.
