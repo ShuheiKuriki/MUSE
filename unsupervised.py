@@ -30,6 +30,8 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--eval_type", type=str, default="all", help="evaluation type during training")
+parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
@@ -96,12 +98,8 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] == 'random':
     params.lr_shrink = 0.8
-    eval_type = last_eval = 'no_target'
 else:
     params.random_vocab = False
-    last_eval = 'all'
-if not params.emb_lr:
-    eval_type = 'only_target'
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -138,7 +136,6 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
-            trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -157,7 +154,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, eval_type)
+        evaluator.all_eval(to_log, params.eval_type)
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -166,12 +163,6 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        # if n_epoch >= 10 and trainer.best_valid_metric == to_log[VALIDATION_METRIC] and trainer.decrease_lr:
-        # logger.info('We got the best metric.')
-        # break
-        # if n_epoch >= 4 and trainer.best_valid_metric < 0.5:
-        # logger.info('Learning failed')
-        # break
         # if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
             # logger.info('Learning rate < 1e-6. BREAK.')
             # break
@@ -198,7 +189,7 @@ if params.n_refinement:
 
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
-        evaluator.all_eval(to_log, eval_type)
+        evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))
@@ -207,7 +198,7 @@ if params.n_refinement:
 
 to_log = OrderedDict()
 trainer.reload_best()
-evaluator.all_eval(to_log, last_eval)
+evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
 logger.info('end of the examination')
 # export embeddings
