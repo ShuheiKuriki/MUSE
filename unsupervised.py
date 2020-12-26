@@ -143,8 +143,8 @@ if params.adversarial:
             # log stats
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                if params.emb_lr:
-                    stats_log.append('Target emb Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
                 logger.info('%06i - %s', n_iter, stats_log)
@@ -156,7 +156,7 @@ if params.adversarial:
                     del stats[k][:]
 
         # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch})
+        to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
         evaluator.all_eval(to_log, eval_type)
         evaluator.eval_dis(to_log)
 
@@ -176,7 +176,7 @@ if params.adversarial:
             # logger.info('Learning rate < 1e-6. BREAK.')
             # break
 
-    logger.info('The best metric is %.4f', trainer.best_valid_metric)
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 # Learning loop for Procrustes Iterative Refinement
 if params.n_refinement:
@@ -197,7 +197,7 @@ if params.n_refinement:
         trainer.procrustes()
 
         # embeddings evaluation
-        to_log = OrderedDict({'n_iter': n_iter})
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
         evaluator.all_eval(to_log, eval_type)
 
         # JSON log / save best model / end of epoch
