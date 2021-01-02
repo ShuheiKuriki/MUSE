@@ -109,60 +109,61 @@ evaluator = Evaluator(trainer)
 
 
 # Learning loop for Adversarial Training
-if params.adversarial:
-    logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
     # training loop
-    for n_epoch in range(params.n_epochs):
+for n_epoch in range(params.n_epochs):
 
-        logger.info('Starting adversarial training epoch %i...', n_epoch)
-        tic = time.time()
-        n_words_proc = 0
-        stats = {'DIS_COSTS': []}
-        stats_str = [('DIS_COSTS', 'Discriminator loss')]
+    logger.info('Starting adversarial training epoch %i...', n_epoch)
+    tic = time.time()
+    n_words_proc = 0
+    stats = {'DIS_COSTS': []}
+    stats_str = [('DIS_COSTS', 'Discriminator loss')]
 
-        for n_iter in range(0, params.epoch_size, params.batch_size):
+    for n_iter in range(0, params.epoch_size, params.batch_size):
 
-            # discriminator training
-            if params.dis_sampling < 1:
-                if np.random.rand() <= params.dis_sampling:
-                    trainer.dis_step(stats)
-            else:
-                for i in range(int(params.dis_sampling)):
-                    trainer.dis_step(stats)
+        # discriminator training
+        if params.dis_sampling < 1:
+            if np.random.rand() <= params.dis_sampling:
+                trainer.dis_step(stats)
+        else:
+            for i in range(int(params.dis_sampling)):
+                trainer.dis_step(stats)
 
-            # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats, mode='emb')
+        # mapping training (discriminator fooling)
+        n_words_proc += trainer.gen_step(stats, mode='emb')
 
-            # log stats
-            if n_iter % 500 == 0:
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                if params.emb_lr:
-                    tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
-                    stats_log.append('Target emb Norm: %.4f' % tgt_norm)
-                stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-                stats_log = ' - '.join(stats_log)
-                logger.info('%06i - %s', n_iter, stats_log)
+        # log stats
+        if n_iter % 500 == 0:
+            stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+            tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+            stats_log.append('Target emb Norm: %.4f' % tgt_norm)
+            stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
+            stats_log = ' - '.join(stats_log)
+            logger.info('%06i - %s', n_iter, stats_log)
 
-                # reset
-                tic = time.time()
-                n_words_proc = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+            # reset
+            tic = time.time()
+            n_words_proc = 0
+            for k, _ in stats_str:
+                del stats[k][:]
 
-        # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, '')
-        evaluator.eval_dis(to_log)
+    # embeddings / discriminator evaluation
+    to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
+    evaluator.all_eval(to_log, '')
+    evaluator.eval_dis(to_log)
 
-        # save best model / end of epoch
-        trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of epoch %i.\n\n', n_epoch)
+    # save best model / end of epoch
+    trainer.save_best(to_log, VALIDATION_METRIC)
+    logger.info('End of epoch %i.\n\n', n_epoch)
 
-        # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
+    # update the learning rate (stop if too small)
+    trainer.update_lr(to_log, VALIDATION_METRIC)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
+logger.info('Writing source embeddings to %s ...', path)
+torch.save(embedding.embs[-1].weight.data, path)
 
 # to_log = OrderedDict()
 # trainer.reload_best()

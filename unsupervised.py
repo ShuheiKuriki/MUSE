@@ -30,7 +30,7 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--eval_type", type=str, default="all", help="evaluation type during training")
+parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -173,8 +173,9 @@ if params.adversarial:
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-    if not params.random_vocab:
-        trainer.reload_best()
+    trainer.reload_best()
+    to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+    evaluator.all_eval(to_log, params.last_eval)
 
     # training loop
     for n_iter in range(params.n_refinement):

@@ -39,8 +39,7 @@ parser.add_argument("--learnable", type=bool_flag, default=False, help="whether 
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
 # random embedding
-parser.add_argument("--emb_init", type=str, default='norm_mean', help="initialize type of embeddings")
-parser.add_argument("--emb_norm", type=float, default=4, help="norm of embeddings")
+parser.add_argument("--emb_file", type=str, default='dumped/learn_map_w_given_emb3/de_es_random/vectors-random.pth', help="initialize file of random")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
@@ -110,7 +109,7 @@ evaluator = Evaluator(trainer)
 if params.adversarial:
     logger.info('----> ADVERSARIAL TRAINING <----\n\n')
 
-    embedding.embs[-1].weight.data = torch.load('dumped/learn_map_after_emb/double_random/vectors-random.pth')['vectors'].weight.data
+    embedding.embs[-1].weight.data = torch.load(params.emb_file)
     embedding.embs[-1].to(params.device)
 
     # map training loop
