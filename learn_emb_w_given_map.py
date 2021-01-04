@@ -167,9 +167,12 @@ if params.adversarial:
 
         logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
-        if trainer.best_valid_metric > 0.563:
-            break
+        # if trainer.best_valid_metric > 0.563:
+            # break
 
+path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
+logger.info('Writing source embeddings to %s ...', path)
+torch.save(embedding.embs[-1].weight.data, path)
 # to_log = OrderedDict()
 # trainer.reload_best()
 # evaluator.all_eval(to_log, '')

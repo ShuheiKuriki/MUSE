@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python unsupervised.py --exp_id nclass_w_random_epoch1M --device 1
+# python learn_emb_only.py --langs de_es_random --exp_name learn_map_w_given_emb3 --emb_init norm_mean --emb_norm 4 --emb_lr 1 --eis_sampling 5 --n_epochs 30
 import os
 import time
 import json

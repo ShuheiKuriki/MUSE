@@ -210,12 +210,12 @@ class Evaluator:
         Run all evaluations.
         """
         self.mapping.eval()
-        for i in range(self.langnum-1):
+        for i in range(self.langnum):
             logger.info('evaluate %s', self.params.langs[i])
             if eval_type == 'no_target':
+                if i == self.langnum-1: continue
                 for j in range(self.langnum-1):
-                    if i == j:
-                        continue
+                    if i == j: continue
                     logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
                     self.crosslingual_wordsim(i, j, to_log)
                     self.word_translation(i, j, to_log)
@@ -223,13 +223,13 @@ class Evaluator:
             elif eval_type == 'all':
                 self.monolingual_wordsim(i)
                 for j in range(self.langnum):
-                    if i == j:
-                        continue
+                    if i == j: continue
                     logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
                     self.crosslingual_wordsim(i, j, to_log)
                     self.word_translation(i, j, to_log)
                     # self.sent_translation(i, j, to_log)
             elif eval_type == 'only_target':
+                if i == self.langnum-1: continue
                 self.crosslingual_wordsim(i, self.langnum-1, to_log)
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
