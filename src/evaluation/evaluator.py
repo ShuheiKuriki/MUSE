@@ -90,8 +90,7 @@ class Evaluator:
             self.dicos[i].lang, self.dicos[i].word2id, src_emb,
             self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
         )
-        if src_tgt_ws_scores is None:
-            return
+        if src_tgt_ws_scores is None: return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
         logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
         # to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
@@ -233,7 +232,8 @@ class Evaluator:
                 self.crosslingual_wordsim(i, self.langnum-1, to_log)
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
-            self.dist_mean_cosine(to_log, i, self.langnum-1)
+            if i < self.langnum-1:
+                self.dist_mean_cosine(to_log, i, self.langnum-1)
         for k in to_log:
             if isinstance(to_log[k], list):
                 to_log[k] = sum(to_log[k])/len(to_log[k])

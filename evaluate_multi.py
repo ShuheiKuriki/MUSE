@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-# python evaluate.py --langs es_de --exp_name evaluate2 --exp_id es_de
+# python evaluate_multi.py --langs de_es --exp_name learn_map_w_given_by_en_emb --exp_id new_norefine_eval --langlist de_es --map_path dumped/learn_map_w_given_by_en_emb/new_norefine
 
 import os
 import argparse
@@ -28,10 +28,11 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langlist", type=str, default='es_en', help="Source language")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
 parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning embeddings")
-
+parser.add_argument("--map_path", type=str, default="dumped/three_langs/", help="Experiment name")
 # reload pre-trained embeddings
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
@@ -58,37 +59,50 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 params.test = False
 params.langs = params.langs.split('_')+['en']
+langlist = params.langlist.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-
+# lang_list = ['fr', 'it', 'es', 'de', 'pt', 'en']
 # build logger / model / trainer / evaluator
 logger = initialize_exp(params)
 mapping, embedding, _ = build_model(params, False)
 trainer = Trainer(mapping, embedding, None, params)
 evaluator = Evaluator(trainer)
 
-for i in range(2):
-    map_path = 'dumped/sample/{}_en_p.3/'.format(params.langs[i])
-    path = os.path.join(map_path, 'best_mapping1.pth')
-    logger.info('* Reloading the model from %s ...', path)
-    # reload the model
-    assert os.path.isfile(path)
-    W = mapping.mappings[i].weight.detach()
-    W.copy_(torch.from_numpy(torch.load(path)).type_as(W))
+if params.langs[0] != 'en':
+    src_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[0])+1))
+    logger.info('* Reloading the model from %s ...', src_path)
+    assert os.path.isfile(src_path)
+    W = mapping.mappings[0].weight.detach()
+    W.copy_(torch.from_numpy(torch.load(src_path)).type_as(W))
+
+if params.langs[1] != 'en':
+    tgt_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[1])+1))
+    logger.info('* Reloading the model from %s ...', tgt_path)
+    assert os.path.isfile(tgt_path)
+    W = mapping.mappings[1].weight.detach()
+    W.copy_(torch.from_numpy(torch.load(tgt_path)).type_as(W))
 
 # run evaluations
 to_log = OrderedDict()
 
-evaluator.all_eval(to_log, 'all')
+evaluator.all_eval(to_log, 'no_target')
+
+# for n_refine in range(params.n_refinement):
+#     trainer.build_dictionary()
+#     trainer.procrustes()
+#     logger.info('End of refine %i.\n', n_refine)
+
+# to_log = OrderedDict()
+# evaluator.all_eval(to_log, 'no_target')
 
 for n_refine in range(params.n_refinement):
-    # trainer.procrustes2(0)
     trainer.procrustes2(1)
     logger.info('End of refine %i.\n', n_refine)
 
 to_log = OrderedDict()
-evaluator.all_eval(to_log, 'all')
+evaluator.all_eval(to_log, 'no_target')
 
 logger.info('end of the examination')
