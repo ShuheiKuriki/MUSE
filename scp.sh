@@ -1,11 +1,4 @@
-lgs1="en"
-lgs2="it"
-for lg1 in ${lgs1}
+for ((i=2; i<7; i++))
 do
-  for lg2 in ${lgs2}
-  do
-    if [ $lg1 != $lg2 ]; then
-      scp -r kuriki@nereus.cl.rcast.u-tokyo.ac.jp:/home/kuriki/MUSE/dumped/learning/$lg1-$lg2-unsup ~/Documents/Github/emojiApp/vectors/$lg1-$lg2-unsup
-    fi
-  done
+  scp -r kuriki@nereus.cl.rcast.u-tokyo.ac.jp:/home/kuriki/MUSE/dumped/learnable_search${i} ~/Documents/Github/MUSE/dumped/learnable_search${i}
 done
