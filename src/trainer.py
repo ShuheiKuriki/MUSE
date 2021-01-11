@@ -211,7 +211,7 @@ class Trainer():
             self.mapping.orthogonalize()
             if self.params.test:
                 logger.info('orthogonalized')
-            #     x, y = self.get_dis_xy()
+                # x, y = self.get_dis_xy()
             #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
                 # logger.info(self.mapping.mappings[0].weight[0][:10])
 
@@ -263,6 +263,28 @@ class Trainer():
             A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
             B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
             W = self.mapping.mappings[i].weight.detach()
+            M = B.transpose(0, 1).mm(A).cpu().numpy()
+            U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
+            W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
+
+    def procrustes2(self, i):
+        """
+        Find the best orthogonal matrix generator using the Orthogonal Procrustes problem
+        https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
+        """
+
+        self._dicos = [0]*(self.langnum-1)
+        tgt_emb = self.mapping(self.embs[i].weight, i).detach()
+        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
+        for j in range(self.langnum-1):
+            if i == j: continue
+            src_emb = self.mapping(self.embs[j].weight, j).detach()
+            src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
+            self._dicos[j] = build_dictionary(src_emb, tgt_emb, self.params)
+
+            A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
+            B = self.mapping(self.embs[i].weight,i).detach()[self._dicos[j][:, 1]]
+            W = self.mapping.mappings[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -338,31 +360,30 @@ class Trainer():
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
-    # def export(self):
-    #     """
-    #     Export embeddings.
-    #     """
-    #     params = self.params
+    def export(self):
+        """
+        Export embeddings.
+        """
+        params = self.params
 
-    #     # load all embeddings
-    #     logger.info("Reloading all embeddings for generator ...")
-    #     embs = [0]*params.langnum
-    #     for i in range(params.langnum):
-    #         params.dicos[i], embs[i] = load_embeddings(params, i, full_vocab=True)
+        # load all embeddings
+        logger.info("Reloading all embeddings for generator ...")
+        embs = [0]*params.langnum
+        for i in range(params.langnum):
+            params.dicos[i], embs[i] = load_embeddings(params, i, full_vocab=True)
 
-    #     # apply same normalization as during training
-    #     for i in range(params.langnum):
-    #         normalize_embeddings(embs[i], params.normalize_embeddings, mean=params.means[i])
-    #     # normalize_embeddings(tgt_emb, params.normalize_embeddings, mean=params.tgt_mean)
+        # apply same normalization as during training
+        for i in range(params.langnum):
+            normalize_embeddings(embs[i], params.normalize_embeddings, mean=params.means[i])
+        # normalize_embeddings(tgt_emb, params.normalize_embeddings, mean=params.tgt_mean)
 
-    #     # map source embeddings to the target space
-    #     bs = 4096
-    #     logger.info("Map source embeddings to the target space ...")
-    #     for j in range(params.langnum-1):
-    #         for i, k in enumerate(range(0, len(embs[j]), bs)):
-    #             with torch.no_grad():
-    #                 x = embs[j][k:k + bs].to(self.params.device)
-    #             embs[j][k:k + bs] = self.mapping[j](x).detach().cpu()
+        # map source embeddings to the target space
+        bs = 4096
+        logger.info("Map source embeddings to the target space ...")
+        for j in range(params.langnum-1):
+            for i, k in enumerate(range(0, len(embs[j]), bs)):
+                x = embs[j][k:k + bs].to(self.params.device)
+                embs[j][k:k + bs] = self.mapping.mappings[j](x).detach().cpu()
 
-    #     # write embeddings to the disk
-    #     export_embeddings(embs, params)
+        # write embeddings to the disk
+        export_embeddings(embs, params)
