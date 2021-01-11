@@ -30,7 +30,7 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--eval_type", type=str, default="no", help="evaluation type during training")
+parser.add_argument("--eval_type", type=str, default="all", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -54,8 +54,8 @@ parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator s
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
-parser.add_argument("--n_epochs", type=int, default=15, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
+parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
+parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
@@ -65,7 +65,7 @@ parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate 
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=10, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -190,8 +190,8 @@ if params.n_refinement:
         trainer.procrustes()
 
         # embeddings evaluation
-        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
-        evaluator.all_eval(to_log, params.eval_type)
+        # to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
+        # evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))
@@ -205,5 +205,5 @@ evaluator.eval_dis(to_log)
 logger.info('end of the examination')
 # export embeddings
 # if params.export:
-    # trainer.reload_best()
-    # trainer.export()
+#     trainer.reload_best()
+#     trainer.export()

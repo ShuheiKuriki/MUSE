@@ -61,7 +61,7 @@ class Mapping(nn.Module):
 
     def forward(self, x, i):
         """map into target space"""
-        return self.mappings[i](x) if i < self.langnum-1 else x
+        return self.mappings[i](x) if 0 <= i < self.langnum-1 else x
 
     def orthogonalize(self):
         """
@@ -101,25 +101,21 @@ class Embedding(nn.Module):
         self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(self.langnum):
             self.embs[i].weight.data = _embs[i]
-            if i == self.langnum-1 and params.emb_lr:
+            if i == self.langnum-1 and params.emb_lr > 0:
                 self.embs[i].weight.requires_grad = True
             else:
                 self.embs[i].weight.requires_grad = False
         params.dicos = dicos
 
-def build_model(params):
+def build_model(params, with_dis=True):
     """
     Build all components of the model.
     """
-    mapping = Mapping(params)
-    embedding = Embedding(params)
+    mapping = Mapping(params).to(params.device)
+    embedding = Embedding(params).to(params.device)
 
     # discriminator
-    discriminator = Discriminator(params)
-    # cuda
-    mapping.to(params.device)
-    embedding.to(params.device)
-    discriminator.to(params.device)
+    discriminator = Discriminator(params).to(params.device) if with_dis else None
 
     # normalize embeddings
     params.means = [normalize_embeddings(embedding.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]
