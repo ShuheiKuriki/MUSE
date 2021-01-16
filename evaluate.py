@@ -9,6 +9,7 @@
 # python evaluate.py --langs es_de --exp_name evaluate2 --exp_id es_de
 
 import os
+import json
 import argparse
 from collections import OrderedDict
 
@@ -70,8 +71,8 @@ trainer = Trainer(mapping, embedding, None, params)
 evaluator = Evaluator(trainer)
 
 for i in range(2):
-    map_path = 'dumped/sample/{}_en_p.3/'.format(params.langs[i])
-    path = os.path.join(map_path, 'best_mapping1.pth')
+    map_path = 'dumped/supervised/{}-en/'.format(params.langs[i])
+    path = os.path.join(map_path, 'best_mapping.pth')
     logger.info('* Reloading the model from %s ...', path)
     # reload the model
     assert os.path.isfile(path)
@@ -81,14 +82,21 @@ for i in range(2):
 # run evaluations
 to_log = OrderedDict()
 
-evaluator.all_eval(to_log, 'all')
+evaluator.all_eval(to_log, 'no_target')
 
-for n_refine in range(params.n_refinement):
+for n_epoch in range(params.n_refinement):
     # trainer.procrustes2(0)
     trainer.procrustes2(1)
-    logger.info('End of refine %i.\n', n_refine)
+    # embeddings evaluation
+    to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': ''})
+    evaluator.all_eval(to_log)
+
+    # JSON log / save best model / end of epoch
+    logger.info("__log__:%s", json.dumps(to_log))
+    trainer.save_best(to_log, VALIDATION_METRIC)
+    logger.info('End of iteration %i.\n\n', n_epoch)
 
 to_log = OrderedDict()
-evaluator.all_eval(to_log, 'all')
+evaluator.all_eval(to_log, 'no_target')
 
 logger.info('end of the examination')
