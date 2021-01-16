@@ -5,7 +5,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python unsupervised.py --exp_id nclass_w_random_epoch1M --device 1
+# python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
+# python unsupervised.py --exp_name five_langs --exp_id pt --langs de_es_it_fr_pt --device cuda:3
 import os
 import time
 import json
@@ -37,6 +38,7 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -65,7 +67,7 @@ parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate 
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=10, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -190,8 +192,8 @@ if params.n_refinement:
         trainer.procrustes()
 
         # embeddings evaluation
-        # to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
-        # evaluator.all_eval(to_log, params.eval_type)
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
+        evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))

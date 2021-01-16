@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python unsupervised.py --exp_id nclass_w_random_epoch1M --device 1
+# python learn_emb_w_given_map.py --langs fr_it_es_de_pt_random --emb_init norm_mean --emb_norm 4.5 --exp_name five_w_enlike2 --device cuda:3 --map_path dumped/six_langs/en_epoch1M5 --exp_id random_vector
 import os
 import time
 import json
@@ -36,6 +36,7 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
+parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -55,7 +56,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=20, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
@@ -97,9 +98,9 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.test = False
 params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
-for l in range(params.langnum-1):
-    params.map_path += params.langs[l]+'-'
-params.map_path += 'en'
+# for l in range(params.langnum-1):
+    # params.map_path += params.langs[l]+'-'
+# params.map_path += 'en'
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
@@ -172,7 +173,7 @@ if params.adversarial:
 
 path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
 logger.info('Writing source embeddings to %s ...', path)
-torch.save(embedding.embs[-1].weight.data, path)
+torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
 # to_log = OrderedDict()
 # trainer.reload_best()
 # evaluator.all_eval(to_log, '')

@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_emb_only.py --langs de_es_random --exp_name learn_map_w_given_emb3 --emb_init norm_mean --emb_norm 4 --emb_lr 1 --eis_sampling 5 --n_epochs 30
+# python learn_emb_only.py --langs fr_random --exp_name five_fr --emb_init norm_mean --emb_norm 4.5 --emb_lr 1 --dis_sampling 1 --n_epochs 30 --device cuda:3
 import os
 import time
 import json
@@ -163,7 +163,7 @@ for n_epoch in range(params.n_epochs):
 logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
 logger.info('Writing source embeddings to %s ...', path)
-torch.save(embedding.embs[-1].weight.data, path)
+torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
 
 # to_log = OrderedDict()
 # trainer.reload_best()

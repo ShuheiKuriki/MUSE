@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-# python evaluate_multi.py --langs de_es --exp_name learn_map_w_given_by_en_emb --exp_id new_norefine_eval --langlist de_es --map_path dumped/learn_map_w_given_by_en_emb/new_norefine
+# python evaluate_multi.py --langs de_es_fr_it_pt --exp_name five_w_enlike2 --exp_id lr.1_p.4_eval --langlist de_es_fr_it_pt --map_path dumped/five_w_enlike2/lr.1_p.4
 
 import os
 import argparse
