@@ -7,6 +7,7 @@
 #
 # python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
 # python unsupervised.py --exp_name five_langs --exp_id pt --langs de_es_it_fr_pt --device cuda:3
+# python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
 import os
 import time
 import json
@@ -57,13 +58,14 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
+parser.add_argument("--random_start", type=int, default=100, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
-parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
+parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
@@ -93,7 +95,8 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 params.metric_size = 10000
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+# VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
 params.test = False
@@ -138,6 +141,9 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
+            if n_epoch >= params.random_start:
+                for _ in range(5):
+                    trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
