@@ -8,7 +8,7 @@
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:0
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:3 --n_epochs 5
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb --exp_id lr0_p1 --langs en_ja_random --device cuda:0 --emb_lr 0 --dis_sampling 1
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_lr.3_p1 --langs de_es_random --device cuda:3 --emb_lr .3 --dis_sampling 1
 
 import os
 import time
@@ -33,6 +33,8 @@ parser.add_argument("--map_path", type=str, default="dumped/three_langs/", help=
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--eval_type", type=str, default="no_target", help="evaluation type during training")
+parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
@@ -58,10 +60,11 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
-parser.add_argument("--random_start", type=int, default=5, help="Number of epochs")
+parser.add_argument("--random_start", type=int, default=0, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="adam", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=2, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
@@ -70,6 +73,8 @@ parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -182,65 +187,45 @@ if params.n_refinement:
         # trainer.reload_best()
 
     # training loop
-    if params.langs[-1] != 'random':
-        for n_iter in range(params.n_refinement):
+    for n_epoch in range(params.n_refinement):
 
-            logger.info('Starting refinement iteration %i...', n_iter)
+        logger.info('Starting refinement iteration %i...', n_epoch)
 
-            # build a dictionary from aligned embeddings
-            trainer.build_dictionary()
-            trainer.procrustes()
+        # build a dictionary from aligned embeddings
+        trainer.build_dictionary()
 
-            # build a dictionary and apply the Procrustes solution
-            # for i in range(params.langnum-1):
-                # trainer.procrustes2(i)
+        # optimize MPSR
+        tic = time.time()
+        n_words_ref = 0
+        stats = {'REFINE_COSTS': []}
+        for n_iter in range(params.ref_steps):
+            # mpsr training step
+            n_words_ref += trainer.refine_step(stats)
+            n_words_ref += trainer.refine_emb_step(stats)
+            # log stats
+            if n_iter % 500 == 0:
+                stats_str = [('REFINE_COSTS', 'Refine loss')]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
+                             for k, v in stats_str if len(stats[k]) > 0]
+                stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
+                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                # reset
+                tic = time.time()
+                n_words_ref = 0
+                for k, _ in stats_str:
+                    del stats[k][:]
 
-            logger.info('End of refinement iteration %i.\n\n', n_iter)
+        # embeddings evaluation
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
+        evaluator.all_eval(to_log, params.eval_type)
 
-        to_log = OrderedDict()
-        trainer.reload_best()
-        evaluator.all_eval(to_log)
-        evaluator.eval_dis(to_log)
-    
-    else:
-        for n_iter in range(params.n_refinement):
-
-            logger.info('Starting refinement iteration %i...', n_iter)
-
-            # build a dictionary from aligned embeddings
-            for i in range(params.langnum-1):
-                trainer.procrustes2(i)
-
-            # build a dictionary and apply the Procrustes solution
-            # for i in range(params.langnum-1):
-                # trainer.procrustes2(i)
-
-            logger.info('End of refinement iteration %i.\n\n', n_iter)
-
-        to_log = OrderedDict()
-        # trainer.reload_best()
-        evaluator.all_eval(to_log, 'no_target')
-        evaluator.eval_dis(to_log)
-
-    # training loop
-    for i in range(params.langnum-1):
-        for n_iter in range(params.n_refinement):
-
-            logger.info('Starting refinement iteration %i...', n_iter)
-
-            # build a dictionary and apply the Procrustes solution
-            trainer.procrustes2(i)
-
-            logger.info('End of refinement iteration %i.\n\n', n_iter)
-
-        to_log = OrderedDict({'n_epoch': 'refine'+str(n_iter), 'tgt_norm': ''})
-        # trainer.reload_best()
-        evaluator.all_eval(to_log, 'no_target')
-        evaluator.eval_dis(to_log)
+        # JSON log / save best model / end of epoch
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
+        logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-# to_log = OrderedDict()
-# trainer.reload_best()
-# evaluator.all_eval(to_log)
-# evaluator.eval_dis(to_log)
+to_log = OrderedDict()
+trainer.reload_best()
+evaluator.all_eval(to_log, params.last_eval)
+evaluator.eval_dis(to_log)
 logger.info('end of the examination')

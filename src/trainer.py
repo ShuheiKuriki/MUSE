@@ -265,6 +265,28 @@ class Trainer():
 
         return langnum * self.params.batch_size
 
+    def refine_emb_step(self, stats):
+        # loss
+        loss = 0
+        langnum = self.params.langnum
+        j = random.choice(list(range(0, langnum-1)))
+        x, y = self.get_refine_xy(langnum-1, j)
+        loss += F.mse_loss(x, y)
+        # check NaN
+        if (loss != loss).any():
+            logger.error("NaN detected (fool discriminator)")
+            sys.exit()
+
+        stats['REFINE_COSTS'].append(loss.item())
+        # optim
+        self.emb_optimizer.zero_grad()
+        loss.backward()
+        self.emb_optimizer.step()
+
+        self.mapping.orthogonalize()
+
+        return langnum * self.params.batch_size
+
     def load_training_dico(self, dico_train):
         """
         Load training dictionary.
@@ -301,7 +323,7 @@ class Trainer():
             for j in range(self.langnum):
                 if i < j:
                     self._dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
-                if i > j:
+                elif i > j:
                     self._dicos[i][j] = self._dicos[j][i][:, [1, 0]]
                 else:
                     idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
