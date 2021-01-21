@@ -8,6 +8,8 @@
 # python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
 # python unsupervised.py --exp_name five_langs --exp_id pt --langs de_es_it_fr_pt --device cuda:3
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
+# python unsupervised.py --exp_name new_six_langs --exp_id sample --langs de_es_it_fr_pt_en --device cuda:2
+# python unsupervised.py --exp_name new_three_langs --exp_id debug --langs de_es_en --device cuda:3
 import os
 import time
 import json
@@ -69,7 +71,9 @@ parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate 
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement epochs (0 to disable the refinement procedure)")
+parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -95,16 +99,13 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 params.metric_size = 10000
-# VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
-VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
+VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+# VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
 params.test = False
 params.langs = params.langs.split('_')
-if params.langs[-1] == 'random':
-    params.lr_shrink = 0.8
-else:
-    params.random_vocab = False
+params.random_vocab = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -180,31 +181,48 @@ if params.adversarial:
 # Learning loop for Procrustes Iterative Refinement
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
+    logger.info('----> ITERATIVE REFINEMENT <----\n\n')
     trainer.reload_best()
     to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
-    evaluator.all_eval(to_log, params.last_eval)
-    evaluator.eval_dis(to_log)
+    # evaluator.all_eval(to_log, params.last_eval)
+    # evaluator.eval_dis(to_log)
 
     # training loop
-    for n_iter in range(params.n_refinement):
+    for n_epoch in range(params.n_refinement):
 
-        logger.info('Starting refinement iteration %i...', n_iter)
+        logger.info('Starting refinement iteration %i...', n_epoch)
 
         # build a dictionary from aligned embeddings
         trainer.build_dictionary()
 
-        # apply the Procrustes solution
-        trainer.procrustes()
+        # optimize MPSR
+        tic = time.time()
+        n_words_ref = 0
+        stats = {'REFINE_COSTS': []}
+        for n_iter in range(params.ref_steps):
+            # mpsr training step
+            n_words_ref += trainer.refine_step(stats)
+            # log stats
+            if n_iter % 500 == 0:
+                stats_str = [('REFINE_COSTS', 'Refine loss')]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
+                             for k, v in stats_str if len(stats[k]) > 0]
+                stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
+                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                # reset
+                tic = time.time()
+                n_words_ref = 0
+                for k, _ in stats_str:
+                    del stats[k][:]
 
         # embeddings evaluation
-        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_iter), 'tgt_norm':''})
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
         evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        logger.info('End of refinement iteration %i.\n\n', n_iter)
+        logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
 to_log = OrderedDict()
 trainer.reload_best()

@@ -11,9 +11,11 @@ import sys
 from logging import getLogger
 import scipy
 import scipy.linalg
+import random
 import torch
 # from torch.autograd import Variable
 from torch.nn import functional as F
+import numpy as np
 
 from .utils import get_optimizer, load_embeddings, normalize_embeddings, export_embeddings
 from .utils import clip_parameters
@@ -53,6 +55,9 @@ class Trainer():
             self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
         else:
             assert discriminator is None
+        if hasattr(params, 'ref_optimizer'):
+            optim_fn, optim_params = get_optimizer(params.ref_optimizer)
+            self.ref_optimizer = optim_fn(mapping.parameters(), **optim_params)
 
         if params.test:
             logger.info('mapping')
@@ -114,6 +119,24 @@ class Trainer():
             y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
 
         y = y.to(self.params.device)
+
+        return x, y
+
+    def get_refine_xy(self, i, j):
+        """
+        Get input batch / output target for MPSR.
+        """
+        # select random word IDs
+        bs = self.params.batch_size
+        dico = self._dicos[i][j]
+        indices = torch.from_numpy(np.random.randint(0, len(dico), bs)).to(self.params.device)
+        dico = dico.index_select(0, indices)
+        src_ids = dico[:, 0].to(self.params.device)
+        tgt_ids = dico[:, 1].to(self.params.device)
+
+        # get word embeddings
+        x = self.mapping(self.embs[i](src_ids), i)
+        y = self.mapping(self.embs[j](tgt_ids), j)
 
         return x, y
 
@@ -217,6 +240,29 @@ class Trainer():
 
         return self.langnum * self.params.batch_size
 
+    def refine_step(self, stats):
+        # loss
+        loss = 0
+        langnum = self.params.langnum
+        for i in range(langnum):
+            j = random.choice(list(range(0, i))+list(range(i+1, langnum)))
+            x, y = self.get_refine_xy(i, j)
+            loss += F.mse_loss(x, y)
+        # check NaN
+        if (loss != loss).any():
+            logger.error("NaN detected (fool discriminator)")
+            sys.exit()
+
+        stats['REFINE_COSTS'].append(loss.item())
+        # optim
+        self.ref_optimizer.zero_grad()
+        loss.backward()
+        self.ref_optimizer.step()
+
+        self.mapping.orthogonalize()
+
+        return langnum * self.params.batch_size
+
     def load_training_dico(self, dico_train):
         """
         Load training dictionary.
@@ -245,14 +291,17 @@ class Trainer():
         """
         Build a dictionary from aligned embeddings.
         """
-        self._dicos = [0]*(self.langnum-1)
-        tgt_emb = self.embs[-1].weight.detach()
-        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
+        self._dicos = [[0]*self.langnum for _ in range(self.langnum)]
+        embs = [self.mapping(self.embs[i].weight, i).detach() for i in range(self.langnum)]
+        embs = [embs[i] / embs[i].norm(2, 1, keepdim=True).expand_as(embs[i]) for i in range(self.langnum)]
 
-        for i in range(self.langnum - 1):
-            src_emb = self.mapping(self.embs[i].weight, i).detach()
-            src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
-            self._dicos[i] = build_dictionary(src_emb, tgt_emb, self.params)
+        for i in range(self.langnum):
+            for j in range(self.langnum):
+                if i == j: continue
+                if i < j:
+                    self._dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
+                if i > j:
+                    self._dicos[i][j] = self._dicos[j][i][:, [1, 0]]
 
     def procrustes(self):
         """
@@ -283,7 +332,7 @@ class Trainer():
             self._dicos[j] = build_dictionary(src_emb, tgt_emb, self.params)
 
             A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
-            B = self.mapping(self.embs[i].weight,i).detach()[self._dicos[j][:, 1]]
+            B = self.mapping(self.embs[i].weight, i).detach()[self._dicos[j][:, 1]]
             W = self.mapping.mappings[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
