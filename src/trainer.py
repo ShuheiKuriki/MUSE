@@ -136,7 +136,9 @@ class Trainer():
 
         # get word embeddings
         x = self.mapping(self.embs[i](src_ids), i)
-        y = self.mapping(self.embs[j](tgt_ids), j)
+        if j < self.langnum-1:
+            x = F.linear(x, self.mapping.mappings[j].weight.t())
+        y = self.embs[j](tgt_ids)
 
         return x, y
 
@@ -245,7 +247,7 @@ class Trainer():
         loss = 0
         langnum = self.params.langnum
         for i in range(langnum):
-            j = random.choice(list(range(0, i))+list(range(i+1, langnum)))
+            j = random.choice(list(range(0, langnum)))
             x, y = self.get_refine_xy(i, j)
             loss += F.mse_loss(x, y)
         # check NaN
@@ -297,11 +299,13 @@ class Trainer():
 
         for i in range(self.langnum):
             for j in range(self.langnum):
-                if i == j: continue
                 if i < j:
                     self._dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
                 if i > j:
                     self._dicos[i][j] = self._dicos[j][i][:, [1, 0]]
+                else:
+                    idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
+                    self._dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
 
     def procrustes(self):
         """
