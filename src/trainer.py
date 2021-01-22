@@ -9,6 +9,7 @@
 import os
 import sys
 from logging import getLogger
+import itertools
 import scipy
 import scipy.linalg
 import random
@@ -52,7 +53,7 @@ class Trainer():
             self.emb_optimizer = optim_fn(embedding.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
-            self.dis_optimizer = optim_fn(discriminators.parameters(), **optim_params)
+            self.dis_optimizer = optim_fn(itertools.chain(*[d.parameters() for d in discriminators]), **optim_params)
         else:
             assert discriminators is None
         if hasattr(params, 'ref_optimizer'):
@@ -178,7 +179,7 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
         for i in range(self.langnum):
-            torch.nn.utils.clip_grad_norm_(self.discriminator[i].parameters(), self.params.clip_grad)
+            torch.nn.utils.clip_grad_norm_(self.discriminators[i].parameters(), self.params.clip_grad)
 
         if self.params.test:
             logger.info('after_dis')
@@ -186,7 +187,7 @@ class Trainer():
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
             # logger.info(torch.exp(new_preds[:10]))
-            logger.info(self.discriminator[0].layers[1].weight.grad[0][:10])
+            logger.info(self.discriminators[0].layers[1].weight.grad[0][:10])
             # print(torch.norm(self.discriminator.layers[1].weight))
             # logger.info(self.mapping.mappings[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)

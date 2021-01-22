@@ -36,7 +36,7 @@ class Evaluator:
         self.embedding = trainer.embedding
         self.dicos = trainer.dicos
         self.mapping = trainer.mapping
-        self.discriminator = trainer.discriminator
+        self.discriminators = trainer.discriminators
         self.params = trainer.params
         self.langnum = self.params.langnum
         # self.num_pairs = (self.langnum-1)*(self.langnum-2)x
@@ -250,7 +250,8 @@ class Evaluator:
         preds_ = [[] for _ in range(langnum)]
         pred_ = [0]*langnum
         confusion_matrix = [[0]*langnum for _ in range(langnum)]
-        self.discriminator.eval()
+        for i in range(langnum):
+            self.discriminators[i].eval()
 
         for i in range(langnum):
             for j in range(0, self.embs[i].num_embeddings, bs):
