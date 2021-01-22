@@ -35,7 +35,7 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
-parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
+parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -98,7 +98,6 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] != 'random':
     params.random_vocab = False
-params.learnable = True
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):

@@ -9,7 +9,7 @@
 # python unsupervised.py --exp_name five_langs --exp_id new_fr --langs de_es_it_pt_fr --device cuda:1
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
 # python unsupervised.py --exp_name new_six_langs --exp_id no_target --langs de_es_it_fr_pt_en --device cuda:2 --eval_type no_target --last_eval no_target
-# python unsupervised.py --exp_name new_three_langs --exp_id debug --langs de_es_en --device cuda:3
+# python unsupervised.py --exp_name new_three_langs --exp_id de_pt_en --langs de_pt_en --device cuda:1
 import os
 import time
 import json
