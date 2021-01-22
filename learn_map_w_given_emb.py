@@ -5,10 +5,12 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:0
+# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id new_lr.3_p.5 --emb_lr .3 --dis_sampling .5 --device cuda:1
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:3 --n_epochs 5
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_lr.3_p1 --langs de_es_random --device cuda:3 --emb_lr .3 --dis_sampling 1
+# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id adam_p.5 --dis_sampling .5 --device cuda:1 --n_epochs 8 --random_start 3 --emb_optimizer adam --ref_optimizer adam
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_adam_p.7_2 --langs de_es_random --device cuda:3 --dis_sampling .7 --emb_optimizer adam --ref_optimizer adam --random_start 3 --n_epochs 8
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr.5_p1_start5 --langs de_es_random --device cuda:2 --emb_lr .5 --dis_sampling 1 --random_start 5 --n_epochs 10
 
 import os
 import time
@@ -64,7 +66,7 @@ parser.add_argument("--random_start", type=int, default=0, help="Number of epoch
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
-parser.add_argument("--emb_optimizer", type=str, default="adam", help="Embedding optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="sgd", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=2, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
@@ -108,9 +110,11 @@ params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.pth'
 params.embpaths = []
+params.learnable = True
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+if params.emb_optimizer == 'sgd':
+    params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)
@@ -162,13 +166,13 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log)
+        evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
         # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='map')
 
         logger.info('End of epoch %i.\n\n', n_epoch)
 
@@ -194,19 +198,19 @@ if params.n_refinement:
         # build a dictionary from aligned embeddings
         trainer.build_dictionary()
 
-        # optimize MPSR
+        logger.info('Starting emb step')
+
+        # optimize embedding
         tic = time.time()
         n_words_ref = 0
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
-            # mpsr training step
             n_words_ref += trainer.refine_step(stats)
             n_words_ref += trainer.refine_emb_step(stats)
-            # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-                             for k, v in stats_str if len(stats[k]) > 0]
+                             for k, v in stats_str if len(stats[k])]
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
                 logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
                 # reset
@@ -214,14 +218,43 @@ if params.n_refinement:
                 n_words_ref = 0
                 for k, _ in stats_str:
                     del stats[k][:]
-
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
         evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
-        logger.info("__log__:%s", json.dumps(to_log))
+        # logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
+
+        # # optimize mapping
+        # tic = time.time()
+        # n_words_ref = 0
+        # stats = {'REFINE_COSTS': []}
+        # for n_iter in range(params.ref_steps):
+        #     # mpsr training step
+        #     n_words_ref += trainer.refine_step(stats)
+        #     # log stats
+        #     if n_iter % 500 == 0:
+        #         stats_str = [('REFINE_COSTS', 'Refine loss')]
+        #         stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
+        #                      for k, v in stats_str if len(stats[k])]
+        #         stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
+        #         logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+        #         # reset
+        #         tic = time.time()
+        #         n_words_ref = 0
+        #         for k, _ in stats_str:
+        #             del stats[k][:]
+
+        # # embeddings evaluation
+        # to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
+        # evaluator.all_eval(to_log, params.eval_type)
+
+        # # JSON log / save best model / end of epoch
+        # # logger.info("__log__:%s", json.dumps(to_log))
+        # trainer.save_best(to_log, VALIDATION_METRIC)
+        # trainer.update_lr(to_log, VALIDATION_METRIC, mode='ref')
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
 to_log = OrderedDict()

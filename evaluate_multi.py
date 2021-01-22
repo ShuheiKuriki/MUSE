@@ -7,6 +7,7 @@
 #
 
 # python evaluate_multi.py --langs de_es_fr_it_pt --exp_name five_w_enlike2 --exp_id lr.1_p.4_eval --langlist de_es_fr_it_pt --map_path dumped/five_w_enlike2/lr.1_p.4
+# python evaluate_multi.py --langs de_es_random --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_lr.3_p1_eval --langlist de_es_fr_it_pt --map_path dumped/learn_map_w_given_by_en_emb2/new_lr.3_p1/de_es
 
 import os
 import argparse

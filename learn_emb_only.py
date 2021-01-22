@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_emb_only.py --langs fr_random --exp_name five_fr --emb_init norm_mean --emb_norm 4.5 --emb_lr 1 --dis_sampling 1 --n_epochs 30 --device cuda:3
+# python learn_emb_only.py --langs de_pt_random --exp_name learn_map_w_given_emb5/de_pt --exp_id random_vector --emb_init norm_mean --emb_norm 4.5 --emb_lr 1 --dis_sampling 1 --n_epochs 40 --device cuda:3
 import os
 import time
 import json

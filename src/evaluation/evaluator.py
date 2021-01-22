@@ -232,9 +232,10 @@ class Evaluator:
                 self.crosslingual_wordsim(i, self.langnum-1, to_log)
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
-            for j in range(self.langnum):
-                if i == j: continue
-                self.dist_mean_cosine(to_log, i, j)
+            # for j in range(self.langnum):
+                # if i == j: continue
+            if i < self.langnum - 1:
+                self.dist_mean_cosine(to_log, i, self.langnum-1)
         for k in to_log:
             if isinstance(to_log[k], list):
                 to_log[k] = sum(to_log[k])/len(to_log[k])

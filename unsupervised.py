@@ -6,9 +6,9 @@
 # LICENSE file in the root directory of this source tree.
 #
 # python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
-# python unsupervised.py --exp_name five_langs --exp_id pt --langs de_es_it_fr_pt --device cuda:3
+# python unsupervised.py --exp_name five_langs --exp_id new_fr --langs de_es_it_pt_fr --device cuda:1
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
-# python unsupervised.py --exp_name new_six_langs --exp_id sample --langs de_es_it_fr_pt_en --device cuda:2
+# python unsupervised.py --exp_name new_six_langs --exp_id no_target --langs de_es_it_fr_pt_en --device cuda:2 --eval_type no_target --last_eval no_target
 # python unsupervised.py --exp_name new_three_langs --exp_id debug --langs de_es_en --device cuda:3
 import os
 import time
@@ -106,6 +106,7 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.test = False
 params.langs = params.langs.split('_')
 params.random_vocab = False
+params.learnable = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -163,7 +164,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, params.eval_type)
+        evaluator.all_eval(to_log, 'no')
         # evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -224,10 +225,10 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-to_log = OrderedDict()
-trainer.reload_best()
-evaluator.all_eval(to_log, params.last_eval)
-evaluator.eval_dis(to_log)
+# to_log = OrderedDict()
+# trainer.reload_best()
+# evaluator.all_eval(to_log, params.last_eval)
+# evaluator.eval_dis(to_log)
 logger.info('end of the examination')
 # export embeddings
 # if params.export:
