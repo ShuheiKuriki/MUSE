@@ -5,7 +5,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_emb_only.py --langs de_pt_random --exp_name learn_map_w_given_emb5/de_pt --exp_id random_vector --emb_init norm_mean --emb_norm 4.5 --emb_lr 1 --dis_sampling 1 --n_epochs 40 --device cuda:3
+# python learn_emb_only.py --langs de_pt_random --exp_name learn_map_w_given_emb5/de_pt --exp_id random_vector2 --emb_init norm_mean --emb_norm 4.5 --emb_optimizer adagrad --dis_sampling 1 --n_epochs 10 --device cuda:0
 import os
 import time
 import json
@@ -57,6 +57,7 @@ parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="adam", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
@@ -97,11 +98,13 @@ params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] != 'random':
     params.random_vocab = False
+params.learnable = True
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+if params.emb_optimizer == 'sgd':
+    params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)

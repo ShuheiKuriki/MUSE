@@ -8,8 +8,8 @@
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id new_lr.3_p.5 --emb_lr .3 --dis_sampling .5 --device cuda:1
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:3 --n_epochs 5
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
-# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id adam_p.5 --dis_sampling .5 --device cuda:1 --n_epochs 8 --random_start 3 --emb_optimizer adam --ref_optimizer adam
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_adam_p.7_2 --langs de_es_random --device cuda:3 --dis_sampling .7 --emb_optimizer adam --ref_optimizer adam --random_start 3 --n_epochs 8
+# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id new_lr.5_p.5 --dis_sampling .5 --device cuda:1 --n_epochs 5 --emb_lr .5
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_rmsprop_p.7 --langs de_es_random --device cuda:3 --dis_sampling .7 --emb_optimizer rmsprop --ref_optimizer rmsprop
 # python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr.5_p1_start5 --langs de_es_random --device cuda:2 --emb_lr .5 --dis_sampling 1 --random_start 5 --n_epochs 10
 
 import os
@@ -166,7 +166,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no')
+        evaluator.all_eval(to_log, 'no_target')
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
