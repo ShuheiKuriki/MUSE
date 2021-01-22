@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 #
 # python learn_map_and_random.py --exp_name en_es_random --exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device cuda:2 --emb_lr 0 --dis_sampling 1
+# python learn_map_and_random.py --exp_name learn_map_w_given_no_en_emb/de_pt --exp_id map --langs de_pt_random --emb_init uniform --device cuda:0 --emb_lr 0 --dis_sampling 5
 
 import os
 import time
@@ -40,7 +41,7 @@ parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initial
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
 # random embedding
 parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
-parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
+parser.add_argument("--emb_norm", type=float, default=0.01, help="norm of embeddings")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
@@ -90,7 +91,8 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 params.metric_size = 10000
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+# VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
 params.test = False
@@ -131,7 +133,7 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
-            trainer.gen_step(stats, mode='emb')
+            # trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -150,7 +152,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log)
+        evaluator.all_eval(to_log, 'no_target')
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -171,8 +173,6 @@ if params.adversarial:
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-    if not params.random_vocab:
-        trainer.reload_best()
 
     # training loop
     for n_iter in range(params.n_refinement):
@@ -181,26 +181,14 @@ if params.n_refinement:
 
         # build a dictionary and apply the Procrustes solution
         trainer.procrustes2(1)
-
-        logger.info('End of refinement iteration %i.\n\n', n_iter)
-
-    to_log = OrderedDict()
-    # trainer.reload_best()
-    evaluator.all_eval(to_log)
-    evaluator.eval_dis(to_log)
-
-    # training loop
-    for n_iter in range(params.n_refinement):
-
-        logger.info('Starting refinement iteration %i...', n_iter)
-
-        # build a dictionary and apply the Procrustes solution
         trainer.procrustes2(0)
 
+        to_log = OrderedDict()
+        # trainer.reload_best()
+        evaluator.all_eval(to_log)
+        evaluator.eval_dis(to_log)
+        trainer.save_best(to_log, VALIDATION_METRIC)
+
         logger.info('End of refinement iteration %i.\n\n', n_iter)
 
-to_log = OrderedDict()
-# trainer.reload_best()
-evaluator.all_eval(to_log)
-evaluator.eval_dis(to_log)
 logger.info('end of the examination')

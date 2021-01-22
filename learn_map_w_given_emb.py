@@ -41,7 +41,7 @@ parser.add_argument("--last_eval", type=str, default="no_target", help="evaluati
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
+parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
 parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -76,7 +76,8 @@ parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the lea
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
-parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
+parser.add_argument("--ref_optimizer", type=str, default="adam", help="map optimizer when refine")
+parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb optimizer when refine")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -110,7 +111,6 @@ params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.pth'
 params.embpaths = []
-params.learnable = True
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
 if params.emb_optimizer == 'sgd':
@@ -198,8 +198,6 @@ if params.n_refinement:
         # build a dictionary from aligned embeddings
         trainer.build_dictionary()
 
-        logger.info('Starting emb step')
-
         # optimize embedding
         tic = time.time()
         n_words_ref = 0
@@ -211,6 +209,8 @@ if params.n_refinement:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
                              for k, v in stats_str if len(stats[k])]
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
                 logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
                 # reset
@@ -219,7 +219,7 @@ if params.n_refinement:
                 for k, _ in stats_str:
                     del stats[k][:]
         # embeddings evaluation
-        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
         evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch

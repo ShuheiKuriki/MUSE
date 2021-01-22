@@ -58,6 +58,9 @@ class Trainer():
         if hasattr(params, 'ref_optimizer'):
             optim_fn, optim_params = get_optimizer(params.ref_optimizer)
             self.ref_optimizer = optim_fn(mapping.parameters(), **optim_params)
+        if hasattr(params, 'emb_ref_optimizer'):
+            optim_fn, optim_params = get_optimizer(params.emb_ref_optimizer)
+            self.emb_ref_optimizer = optim_fn(embedding.parameters(), **optim_params)
 
         if params.test:
             logger.info('mapping')
@@ -285,9 +288,9 @@ class Trainer():
 
         stats['REFINE_COSTS'].append(loss.item())
         # optim
-        self.emb_optimizer.zero_grad()
+        self.emb_ref_optimizer.zero_grad()
         loss.backward()
-        self.emb_optimizer.step()
+        self.emb_ref_optimizer.step()
 
         return langnum * self.params.batch_size
 
