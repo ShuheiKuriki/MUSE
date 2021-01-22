@@ -23,16 +23,18 @@ class Discriminator(nn.Module):
         self.dis_dropout = params.dis_dropout
         self.dis_input_dropout = params.dis_input_dropout
 
-        layers = [nn.Dropout(self.dis_input_dropout)]
-        for i in range(self.dis_layers + 1):
-            input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
-            output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
-            layers.append(nn.Linear(input_dim, output_dim))
-            if i < self.dis_layers:
-                layers.append(nn.LeakyReLU(0.2))
-                layers.append(nn.Dropout(self.dis_dropout))
-        layers.append(nn.Sigmoid())
-        self.layers = nn.Sequential(*layers)
+        self.models = nn.ModuleList()
+        for l in range(params.langnum):
+            layers = [nn.Dropout(self.dis_input_dropout)]
+            for i in range(self.dis_layers + 1):
+                input_dim = self.emb_dim if i == 0 else self.dis_hid_dim
+                output_dim = 1 if i == self.dis_layers else self.dis_hid_dim
+                layers.append(nn.Linear(input_dim, output_dim))
+                if i < self.dis_layers:
+                    layers.append(nn.LeakyReLU(0.2))
+                    layers.append(nn.Dropout(self.dis_dropout))
+            layers.append(nn.Sigmoid())
+            self.models.append(nn.Sequential(*layers))
 
     def forward(self, x):
         assert x.dim() == 2 and x.size(1) == self.emb_dim
@@ -114,7 +116,7 @@ def build_model(params, with_dis=True):
     embedding = Embedding(params).to(params.device)
 
     # discriminator
-    discriminators = [Discriminator(params).to(params.device) if with_dis else None for _ in range(params.langnum)]
+    discriminators = Discriminator(params).to(params.device) if with_dis else None
 
     # normalize embeddings
     params.means = [normalize_embeddings(embedding.embs[i].weight.detach(), params.normalize_embeddings) for i in range(params.langnum)]

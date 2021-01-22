@@ -53,7 +53,8 @@ class Trainer():
             self.emb_optimizer = optim_fn(embedding.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
-            self.dis_optimizer = optim_fn(itertools.chain(*[d.parameters() for d in discriminators]), **optim_params)
+            # self.dis_optimizer = optim_fn(itertools.chain(*[d.parameters() for d in discriminators.models]), **optim_params)
+            self.dis_optimizer = optim_fn(discriminators.models[0].parameters(), **optim_params)
         else:
             assert discriminators is None
         if hasattr(params, 'ref_optimizer'):
@@ -67,12 +68,16 @@ class Trainer():
             logger.info('mapping')
             for param in mapping.parameters():
                 logger.info(param.size())
+            logger.info(mapping.mappings[0].weight.requires_grad)
             logger.info('embedding')
             for param in embedding.parameters():
                 logger.info(param.size())
+            logger.info(embedding.embs[0].weight.requires_grad)
             logger.info('discriminator')
-            for param in discriminators.parameters():
-                logger.info(param.size())
+            for i in range(self.langnum):
+                for param in discriminators.models[i].parameters():
+                    logger.info(param.size())
+            logger.info(discriminators.models[0][1].weight.requires_grad)
 
         # best validation score
         self.prev_metric = -1e12
@@ -149,7 +154,7 @@ class Trainer():
         Train the discriminator.
         """
         for i in range(self.langnum):
-            self.discriminators[i].train()
+            self.discriminators.models[i].train()
 
         # loss
         loss = 0
@@ -159,12 +164,16 @@ class Trainer():
             j = random.choice(list(range(0, self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators[i](x.detach())
+            preds = self.discriminators.models[i](x)
             loss += F.binary_cross_entropy(preds, y)
         
         if self.params.test:
             logger.info('dis_start')
-            # logger.info(torch.exp(preds[:10]))
+            logger.info(self.discriminators.models[0][4].weight[0][:10])
+            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
+            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
+            # logger.info(preds[:10])
             # logger.info(self.mapping.mappings[0].weight[0][:10])
 
         # check NaN
@@ -179,7 +188,7 @@ class Trainer():
         loss.backward()
         self.dis_optimizer.step()
         for i in range(self.langnum):
-            torch.nn.utils.clip_grad_norm_(self.discriminators[i].parameters(), self.params.clip_grad)
+            torch.nn.utils.clip_grad_norm_(self.discriminators.models[i].parameters(), self.params.clip_grad)
 
         if self.params.test:
             logger.info('after_dis')
@@ -187,7 +196,11 @@ class Trainer():
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
             # logger.info(torch.exp(new_preds[:10]))
-            logger.info(self.discriminators[0].layers[1].weight.grad[0][:10])
+            # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
+            logger.info(self.discriminators.models[0][4].weight[0][:10])
+            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
+            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
             # print(torch.norm(self.discriminator.layers[1].weight))
             # logger.info(self.mapping.mappings[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
@@ -197,7 +210,7 @@ class Trainer():
         Fooling discriminator training step.
         """
         for i in range(self.langnum):
-            self.discriminators[i].eval()
+            self.discriminators.models[i].eval()
 
         # loss
         loss = 0
@@ -207,7 +220,7 @@ class Trainer():
             j = random.choice(list(range(0, self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators[i](x.detach())
+            preds = self.discriminators.models[i](x)
             loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
@@ -235,7 +248,11 @@ class Trainer():
         if self.params.test:
             logger.info('after_%s', mode)
             # print(torch.norm(self.discriminator.layers[1].weight))
-            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
+            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
+            logger.info(self.discriminators.models[0][4].weight[0][:10])
+            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
             # for i in range(self.langnum):
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
         #     logger.info(torch.exp(new_preds[:10]))
