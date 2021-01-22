@@ -55,7 +55,7 @@ parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
 parser.add_argument("--dis_sampling", type=float, default=0.3, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
-parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
+parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")

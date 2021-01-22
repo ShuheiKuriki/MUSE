@@ -29,7 +29,7 @@ logger = getLogger()
 class Trainer():
     """train class"""
 
-    def __init__(self, mapping, embedding, discriminator, params):
+    def __init__(self, mapping, embedding, discriminators, params):
         """
         Initialize trainer script.
         """
@@ -38,7 +38,7 @@ class Trainer():
         self.embs = embedding.embs
         self.dicos = params.dicos
         self.mapping = mapping
-        self.discriminator = discriminator
+        self.discriminators = discriminators
         self.params = params
         self.langnum = self.params.langnum
         self._dicos = [0]*(self.langnum-1)
@@ -52,9 +52,9 @@ class Trainer():
             self.emb_optimizer = optim_fn(embedding.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
-            self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
+            self.dis_optimizer = optim_fn(discriminators.parameters(), **optim_params)
         else:
-            assert discriminator is None
+            assert discriminators is None
         if hasattr(params, 'ref_optimizer'):
             optim_fn, optim_params = get_optimizer(params.ref_optimizer)
             self.ref_optimizer = optim_fn(mapping.parameters(), **optim_params)
@@ -67,7 +67,7 @@ class Trainer():
             for param in embedding.parameters():
                 logger.info(param.size())
             logger.info('discriminator')
-            for param in discriminator.parameters():
+            for param in discriminators.parameters():
                 logger.info(param.size())
 
         # best validation score
@@ -76,7 +76,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self):
+    def get_dis_xy(self, i, j):
         """
         Get discriminator input batch / output target.
         """
@@ -88,21 +88,20 @@ class Trainer():
         assert mf <= min(map(len, self.dicos))
 
         # get ids
-        ids = [0]*langnum
-        for i in range(langnum):
-            if self.params.test:
-                ids[i] = torch.arange(0, bs, dtype=torch.int64)
-            elif rv and i == langnum-1:
-                ids[i] = torch.LongTensor(bs).random_(rv)
-            else:
-                ids[i] = torch.LongTensor(bs).random_(mf)
-        for i in range(self.langnum):
-            ids[i] = ids[i].to(self.params.device)
+        if self.params.test:
+            src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+            tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+        elif rv and i == langnum-1:
+            src_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
+            tgt_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
+        else:
+            src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
+            tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
-        embs = [0]*langnum
-        for i in range(langnum):
-            embs[i] = self.mapping(self.embs[i](ids[i]), i)
+        src_emb = self.mapping(self.embs[i](src_ids), i)
+        if j < self.langnum-1: src_emb = F.linear(src_emb, self.mapping.mappings[j].weight.t())
+        tgt_emb = self.embs[j](tgt_ids)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.mappings[1].weight)))
@@ -111,15 +110,14 @@ class Trainer():
                 # logger.info(self.embs[2].weight.grad)
 
         # input / target
-        x = torch.cat(embs, 0)
+        x = torch.cat([src_emb, tgt_emb], 0)
+        y = torch.FloatTensor(2 * bs).zero_()
 
-        # cross_entropyの場合
-        y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        for i in range(langnum):
-            y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
-
+        # 0 indicates real (lang2) samples
+        y[:bs] = 1 - self.params.dis_smooth
+        y[bs:] = self.params.dis_smooth
         y = y.to(self.params.device)
-
+        
         return x, y
 
     def get_refine_xy(self, i, j):
@@ -146,18 +144,24 @@ class Trainer():
         """
         Train the discriminator.
         """
-        self.discriminator.train()
+        for i in range(self.langnum):
+            self.discriminators[i].train()
 
         # loss
-        x, y = self.get_dis_xy()
-        preds = self.discriminator(x)
+        loss = 0
+        # for each target language
+        for i in range(self.langnum):
+            # random select a source language
+            j = random.choice(list(range(0, self.langnum)))
+
+            x, y = self.get_dis_xy(i, j)
+            preds = self.discriminators[i](x.detach())
+            loss += F.binary_cross_entropy(preds, y)
+        
         if self.params.test:
             logger.info('dis_start')
             # logger.info(torch.exp(preds[:10]))
             # logger.info(self.mapping.mappings[0].weight[0][:10])
-
-        # cross_entropyの場合
-        loss = torch.mean(torch.sum(-y*preds, dim=1))
 
         # check NaN
         if (loss != loss).detach().any():
@@ -169,8 +173,9 @@ class Trainer():
         # optim
         self.dis_optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
         self.dis_optimizer.step()
+        for i in range(self.langnum):
+            torch.nn.utils.clip_grad_norm_(self.discriminator[i].parameters(), self.params.clip_grad)
 
         if self.params.test:
             logger.info('after_dis')
@@ -178,7 +183,7 @@ class Trainer():
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
             # logger.info(torch.exp(new_preds[:10]))
-            logger.info(self.discriminator.layers[1].weight.grad[0][:10])
+            logger.info(self.discriminator[0].layers[1].weight.grad[0][:10])
             # print(torch.norm(self.discriminator.layers[1].weight))
             # logger.info(self.mapping.mappings[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
@@ -187,18 +192,19 @@ class Trainer():
         """
         Fooling discriminator training step.
         """
-        self.discriminator.eval()
+        for i in range(self.langnum):
+            self.discriminators[i].eval()
 
         # loss
-        x, y = self.get_dis_xy()
-        # logger.info(torch.mean(torch.norm(self.embs[-1].weight.detach(), dim=1)))
-        preds = self.discriminator(x)
-        if self.params.test:
-            logger.info('%s_start', mode)
-        #     logger.info(torch.exp(preds[:10]))
-        #     logger.info(self.mapping.mappings[0].weight[0][:10])
+        loss = 0
+        # for each target language
+        for i in range(self.langnum):
+            # random select a source language
+            j = random.choice(list(range(0, self.langnum)))
 
-        loss = torch.mean(torch.sum(-(self.params.entropy_coef/self.langnum-y)*preds, dim=1))
+            x, y = self.get_dis_xy(i, j)
+            preds = self.discriminators[i](x.detach())
+            loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
         if (loss != loss).detach().any():
