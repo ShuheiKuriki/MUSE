@@ -76,14 +76,14 @@ if params.langs[0] != 'en':
     src_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[0])+1))
     logger.info('* Reloading the model from %s ...', src_path)
     assert os.path.isfile(src_path)
-    W = mapping.mappings[0].weight.detach()
+    W = mapping.models[0].weight.detach()
     W.copy_(torch.from_numpy(torch.load(src_path)).type_as(W))
 
 if params.langs[1] != 'en':
     tgt_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[1])+1))
     logger.info('* Reloading the model from %s ...', tgt_path)
     assert os.path.isfile(tgt_path)
-    W = mapping.mappings[1].weight.detach()
+    W = mapping.models[1].weight.detach()
     W.copy_(torch.from_numpy(torch.load(tgt_path)).type_as(W))
 
 # run evaluations

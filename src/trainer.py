@@ -54,7 +54,7 @@ class Trainer():
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
             # self.dis_optimizer = optim_fn(itertools.chain(*[d.parameters() for d in discriminators.models]), **optim_params)
-            self.dis_optimizer = optim_fn(discriminators.models[0].parameters(), **optim_params)
+            self.dis_optimizer = optim_fn(discriminators.parameters(), **optim_params)
         else:
             assert discriminators is None
         if hasattr(params, 'ref_optimizer'):
@@ -68,14 +68,14 @@ class Trainer():
             logger.info('mapping')
             for param in mapping.parameters():
                 logger.info(param.size())
-            logger.info(mapping.mappings[0].weight.requires_grad)
+            logger.info(mapping.models[0].weight.requires_grad)
             logger.info('embedding')
             for param in embedding.parameters():
                 logger.info(param.size())
             logger.info(embedding.embs[0].weight.requires_grad)
             logger.info('discriminator')
             for i in range(self.langnum):
-                for param in discriminators.models[i].parameters():
+                for param in discriminators.parameters():
                     logger.info(param.size())
             logger.info(discriminators.models[0][1].weight.requires_grad)
 
@@ -109,11 +109,11 @@ class Trainer():
 
         # get word embeddings
         src_emb = self.mapping(self.embs[i](src_ids), i)
-        if j < self.langnum-1: src_emb = F.linear(src_emb, self.mapping.mappings[j].weight.t())
+        if j < self.langnum-1: src_emb = F.linear(src_emb, self.mapping.models[j].weight.t())
         tgt_emb = self.embs[j](tgt_ids)
 
         # if self.params.test:
-            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.mappings[1].weight)))
+            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.models[1].weight)))
             # if isinstance(self.embs[2].weight.grad, torch.Tensor):
                 # logger.info(self.embs[2].weight.grad.size())
                 # logger.info(self.embs[2].weight.grad)
@@ -144,7 +144,7 @@ class Trainer():
         # get word embeddings
         x = self.mapping(self.embs[i](src_ids), i)
         if j < self.langnum-1:
-            x = F.linear(x, self.mapping.mappings[j].weight.t())
+            x = F.linear(x, self.mapping.models[j].weight.t())
         y = self.embs[j](tgt_ids)
 
         return x, y
@@ -164,7 +164,7 @@ class Trainer():
             j = random.choice(list(range(0, self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators.models[i](x)
+            preds = self.discriminators(x, i)
             loss += F.binary_cross_entropy(preds, y)
         
         if self.params.test:
@@ -174,7 +174,7 @@ class Trainer():
             # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
             # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
             # logger.info(preds[:10])
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.models[0].weight[0][:10])
 
         # check NaN
         if (loss != loss).detach().any():
@@ -202,7 +202,7 @@ class Trainer():
             # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
             # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
             # print(torch.norm(self.discriminator.layers[1].weight))
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.models[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
 
     def gen_step(self, stats, mode='map'):
@@ -220,7 +220,7 @@ class Trainer():
             j = random.choice(list(range(0, self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators.models[i](x)
+            preds = self.discriminators(x, i)
             loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
@@ -256,8 +256,8 @@ class Trainer():
             # for i in range(self.langnum):
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
         #     logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.mapping.mappings[0].weight.grad[0][:10])
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.models[0].weight.grad[0][:10])
+            # logger.info(self.mapping.models[0].weight[0][:10])
         #     logger.info('Mapping loss %.4f', new_loss)
         if mode == 'map':
             self.mapping.orthogonalize()
@@ -265,7 +265,7 @@ class Trainer():
                 logger.info('orthogonalized')
                 # x, y = self.get_dis_xy()
             #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
-                # logger.info(self.mapping.mappings[0].weight[0][:10])
+                # logger.info(self.mapping.models[0].weight[0][:10])
 
         return self.langnum * self.params.batch_size
 
@@ -362,7 +362,7 @@ class Trainer():
         for i in range(self.langnum - 1):
             A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
             B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.models[i].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -384,7 +384,7 @@ class Trainer():
 
             A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
             B = self.mapping(self.embs[i].weight, i).detach()[self._dicos[j][:, 1]]
-            W = self.mapping.mappings[j].weight.detach()
+            W = self.mapping.models[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -436,7 +436,7 @@ class Trainer():
             # save the generator
 
             for i in range(self.langnum-1):
-                W = self.mapping.mappings[i].weight.detach().cpu().numpy()
+                W = self.mapping.models[i].weight.detach().cpu().numpy()
                 path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
                 logger.info('* Saving the generator to %s ...', path)
                 torch.save(W, path)
@@ -451,7 +451,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.models[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -465,7 +465,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.models[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -492,7 +492,7 @@ class Trainer():
         for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = embs[j][k:k + bs].to(self.params.device)
-                embs[j][k:k + bs] = self.mapping.mappings[j](x).detach().cpu()
+                embs[j][k:k + bs] = self.mapping.models[j](x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)

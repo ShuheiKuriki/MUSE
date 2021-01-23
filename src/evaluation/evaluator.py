@@ -257,7 +257,7 @@ class Evaluator:
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
                 if i < langnum-1:
-                    preds = self.discriminator(self.mapping.mappings[i](emb).detach())
+                    preds = self.discriminator(self.mapping.models[i](emb).detach())
                 else:
                     preds = self.discriminator(emb)
                 preds_[i].extend(torch.exp(preds).detach().cpu().tolist())

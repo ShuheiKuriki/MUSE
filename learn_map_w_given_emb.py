@@ -5,11 +5,11 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id new_lr.3_p.5 --emb_lr .3 --dis_sampling .5 --device cuda:1
+# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id mat_lr.3_p.3 --emb_lr .3 --dis_sampling .3 --device cuda:1
 # python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:3 --n_epochs 5
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
-# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id new_lr.5_p.5 --dis_sampling .5 --device cuda:1 --n_epochs 5 --emb_lr .5
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_rmsprop_p.7 --langs de_es_random --device cuda:3 --dis_sampling .7 --emb_optimizer rmsprop --ref_optimizer rmsprop
+# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id mat_lr.5_p.3 --dis_sampling .3 --device cuda:3 --n_epochs 10 --emb_lr .5
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_pt --exp_id mat_lr.5_adam_p.3 --langs de_pt_random --device cuda:1 --dis_sampling .3 --emb_optimizer sgd --emb_lr .5
 # python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr.5_p1_start5 --langs de_es_random --device cuda:2 --emb_lr .5 --dis_sampling 1 --random_start 5 --n_epochs 10
 
 import os

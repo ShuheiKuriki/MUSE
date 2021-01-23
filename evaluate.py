@@ -76,7 +76,7 @@ for i in range(2):
     logger.info('* Reloading the model from %s ...', path)
     # reload the model
     assert os.path.isfile(path)
-    W = mapping.mappings[i].weight.detach()
+    W = mapping.models[i].weight.detach()
     W.copy_(torch.from_numpy(torch.load(path)).type_as(W))
 
 # run evaluations
