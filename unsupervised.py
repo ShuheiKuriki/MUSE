@@ -8,8 +8,9 @@
 # python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
 # python unsupervised.py --exp_name five_langs --exp_id new_fr --langs de_es_it_pt_fr --device cuda:1
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
+# python unsupervised.py --exp_name seven_langs_new --exp_id en_p.5 --langs ja_de_es_it_fr_pt_en --device cuda:1 --n_epochs 10 --dis_sampling .5 --eval_type all --last_eval all
 # python unsupervised.py --exp_name new_six_langs --exp_id no_target --langs de_es_it_fr_pt_en --device cuda:2 --eval_type no_target --last_eval no_target
-# python unsupervised.py --exp_name new_three_langs --exp_id de_pt_en --langs de_pt_en --device cuda:1
+# python unsupervised.py --exp_name three_langs_new --exp_id ja_fr_en --langs ja_fr_en --device cuda:2
 import os
 import time
 import json
@@ -40,7 +41,9 @@ parser.add_argument("--last_eval", type=str, default="all", help="evaluation typ
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--learnable", type=bool, default=False, help="learn last emb")
+
 parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -105,8 +108,6 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # build model / trainer / evaluator
 params.test = False
 params.langs = params.langs.split('_')
-params.random_vocab = False
-params.learnable = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):

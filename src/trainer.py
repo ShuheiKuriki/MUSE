@@ -108,7 +108,7 @@ class Trainer():
             embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
-            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.mappings[1].weight)))
+            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
             # if isinstance(self.embs[2].weight.grad, torch.Tensor):
                 # logger.info(self.embs[2].weight.grad.size())
                 # logger.info(self.embs[2].weight.grad)
@@ -140,7 +140,7 @@ class Trainer():
         # get word embeddings
         x = self.mapping(self.embs[i](src_ids), i)
         if j < self.langnum-1:
-            x = F.linear(x, self.mapping.mappings[j].weight.t())
+            x = F.linear(x, self.mapping.linear[j].weight.t())
         y = self.embs[j](tgt_ids)
 
         return x, y
@@ -157,7 +157,7 @@ class Trainer():
         if self.params.test:
             logger.info('dis_start')
             # logger.info(torch.exp(preds[:10]))
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.linear[0].weight[0][:10])
 
         # cross_entropyの場合
         loss = torch.mean(torch.sum(-y*preds, dim=1))
@@ -183,7 +183,7 @@ class Trainer():
             # logger.info(torch.exp(new_preds[:10]))
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             # print(torch.norm(self.discriminator.layers[1].weight))
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.linear[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
 
     def gen_step(self, stats, mode='map'):
@@ -199,7 +199,7 @@ class Trainer():
         if self.params.test:
             logger.info('%s_start', mode)
         #     logger.info(torch.exp(preds[:10]))
-        #     logger.info(self.mapping.mappings[0].weight[0][:10])
+        #     logger.info(self.mapping.linear[0].weight[0][:10])
 
         loss = torch.mean(torch.sum(-(self.params.entropy_coef/self.langnum-y)*preds, dim=1))
 
@@ -232,8 +232,8 @@ class Trainer():
             # for i in range(self.langnum):
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
         #     logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.mapping.mappings[0].weight.grad[0][:10])
-            # logger.info(self.mapping.mappings[0].weight[0][:10])
+            # logger.info(self.mapping.linear[0].weight.grad[0][:10])
+            # logger.info(self.mapping.linear[0].weight[0][:10])
         #     logger.info('Mapping loss %.4f', new_loss)
         if mode == 'map':
             self.mapping.orthogonalize()
@@ -241,7 +241,7 @@ class Trainer():
                 logger.info('orthogonalized')
                 # x, y = self.get_dis_xy()
             #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
-                # logger.info(self.mapping.mappings[0].weight[0][:10])
+                # logger.info(self.mapping.linear[0].weight[0][:10])
 
         return self.langnum * self.params.batch_size
 
@@ -338,7 +338,7 @@ class Trainer():
         for i in range(self.langnum - 1):
             A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
             B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -360,7 +360,7 @@ class Trainer():
 
             A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
             B = self.mapping(self.embs[i].weight, i).detach()[self._dicos[j][:, 1]]
-            W = self.mapping.mappings[j].weight.detach()
+            W = self.mapping.linear[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -412,7 +412,7 @@ class Trainer():
             # save the generator
 
             for i in range(self.langnum-1):
-                W = self.mapping.mappings[i].weight.detach().cpu().numpy()
+                W = self.mapping.linear[i].weight.detach().cpu().numpy()
                 path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
                 logger.info('* Saving the generator to %s ...', path)
                 torch.save(W, path)
@@ -427,7 +427,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -441,7 +441,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.mappings[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -468,7 +468,7 @@ class Trainer():
         for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = embs[j][k:k + bs].to(self.params.device)
-                embs[j][k:k + bs] = self.mapping.mappings[j](x).detach().cpu()
+                embs[j][k:k + bs] = self.mapping.linear[j](x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)

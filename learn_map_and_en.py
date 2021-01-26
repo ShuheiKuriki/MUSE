@@ -5,7 +5,9 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_map_and_en.py --langs de_es_en --exp_name en_learnable --exp_id lr.5_p.5_3 --emb_lr .5 --dis_sampling .5 --device cuda:2
+# python learn_map_and_en.py --langs de_pt_fr_it_es_en --exp_name en_learnable/six_langs --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:2
+# python learn_map_and_en.py --langs de_pt_fr_it_es_en_en --exp_name en_learnable/six+en --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:1
+# python learn_map_and_en.py --langs ja_de_pt_fr_it_es_en --exp_name en_learnable/seven_langs --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:3
 
 import os
 import time
@@ -34,6 +36,7 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--learnable", type=bool, default=True, help="learn last emb")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -49,7 +52,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
-parser.add_argument("--n_epochs2", type=int, default=5, help="Number of epochs")
+parser.add_argument("--random_start", type=int, default=0, help="epoch which start random lerning")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
@@ -61,6 +64,10 @@ parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_emb_start", type=int, default=0, help="epoch which start random lerning")
+parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
+parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="refine optimizer")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -125,6 +132,8 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
+            if n_epoch >= params.random_start:
+                trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -142,57 +151,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log)
-        evaluator.eval_dis(to_log)
-
-        # save best model / end of epoch
-        trainer.save_best(to_log, VALIDATION_METRIC)
-        # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
-
-        logger.info('End of epoch %i.\n\n', n_epoch)
-
-        if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
-            logger.info('Learning rate < 1e-6. BREAK.')
-            break
-
-    # map training loop
-    for n_epoch in range(params.n_epochs2):
-
-        logger.info('Starting adversarial training epoch %i...', n_epoch)
-        n_words_proc = 0
-        stats = {'DIS_COSTS': []}
-        stats_str = [('DIS_COSTS', 'Discriminator loss')]
-
-        for n_iter in range(0, params.epoch_size, params.batch_size):
-
-            # discriminator training
-            if params.dis_sampling < 1:
-                if np.random.rand() <= params.dis_sampling: trainer.dis_step(stats)
-            else:
-                for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
-
-            # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats, mode='map')
-            trainer.gen_step(stats, mode='emb')
-
-            # log stats
-            if n_iter % 500 == 0:
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
-                stats_log.append('Target emb Norm: %.4f' % tgt_norm)
-                stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
-                stats_log = ' - '.join(stats_log)
-                logger.info('%06i - %s', n_iter, stats_log)
-
-                # reset
-                tic = time.time()
-                n_words_proc = 0
-                for k, _ in stats_str: del stats[k][:]
-
-        # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log)
+        evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -215,37 +174,47 @@ if params.n_refinement:
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
 
     # training loop
-    for n_iter in range(params.n_refinement):
+    for n_epoch in range(params.n_refinement):
 
-        logger.info('Starting refinement iteration %i...', n_iter)
+        logger.info('Starting refinement iteration %i...', n_epoch)
 
+        # build a dictionary from aligned embeddings
         trainer.build_dictionary()
-        trainer.procrustes()
 
-        logger.info('End of refinement iteration %i.\n\n', n_iter)
+        # optimize embedding
+        tic = time.time()
+        n_words_ref = 0
+        stats = {'REFINE_COSTS': []}
+        for n_iter in range(params.ref_steps):
+            n_words_ref += trainer.refine_step(stats)
+            if n_epoch >= params.ref_emb_start:
+                n_words_ref += trainer.refine_emb_step(stats)
+            if n_iter % 500 == 0:
+                stats_str = [('REFINE_COSTS', 'Refine loss')]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
+                             for k, v in stats_str if len(stats[k])]
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                stats_log.append('Target emb Norm: %.4f' % tgt_norm)
+                stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
+                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                # reset
+                tic = time.time()
+                n_words_ref = 0
+                for k, _ in stats_str:
+                    del stats[k][:]
+        # embeddings evaluation
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
+        evaluator.all_eval(to_log, 'no_target')
 
-    to_log = OrderedDict()
-    # trainer.reload_best()
-    evaluator.all_eval(to_log, 'no_target')
-    evaluator.eval_dis(to_log)
+        # JSON log / save best model / end of epoch
+        # logger.info("__log__:%s", json.dumps(to_log))
+        trainer.save_best(to_log, VALIDATION_METRIC)
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
-    # training loop
-    for n_iter in range(params.n_refinement):
+        logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-        logger.info('Starting refinement iteration %i...', n_iter)
-
-        # build a dictionary and apply the Procrustes solution
-        trainer.procrustes2(1)
-
-        logger.info('End of refinement iteration %i.\n\n', n_iter)
-
-    to_log = OrderedDict()
-    # trainer.reload_best()
-    evaluator.all_eval(to_log, 'no_target')
-    evaluator.eval_dis(to_log)
-
-to_log = OrderedDict()
+# to_log = OrderedDict()
 # trainer.reload_best()
-evaluator.all_eval(to_log, 'no_target')
-evaluator.eval_dis(to_log)
+# evaluator.all_eval(to_log, 'no_target')
+# evaluator.eval_dis(to_log)
 logger.info('end of the examination')

@@ -46,7 +46,7 @@ def load_dictionary(path, word2id1, word2id2):
     Return a torch tensor of size (n, 2) where n is the size of the
     loader dictionary, and sort it by source word frequency.
     """
-    assert os.path.isfile(path)
+    if not os.path.isfile(path): return None
 
     pairs = []
     not_found = 0
@@ -94,6 +94,7 @@ def get_word_translation_accuracy(lang1, word2id1, emb1, lang2, word2id2, emb2, 
     else:
         path = dico_eval
     dico = load_dictionary(path, word2id1, word2id2)
+    if dico is None: return None
     dico = dico.cuda() if emb1.is_cuda else dico
 
     assert dico[:, 0].max() < emb1.size(0)

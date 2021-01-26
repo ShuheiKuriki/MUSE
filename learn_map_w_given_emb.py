@@ -5,12 +5,16 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_w_enlike --exp_id new_lr.3_p.5 --emb_lr .3 --dis_sampling .5 --device cuda:1
-# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name five_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:3 --n_epochs 5
+# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name fives/five_w_enlike --exp_id new_lr.3_p.5 --emb_lr .3 --dis_sampling .5 --device cuda:1
+# python learn_map_w_given_emb.py --langs fr_de_es_it_pt_random --exp_name fives/five+frlike --exp_id lr0_asgd_p.7 --ref_optimizer asgd --emb_ref_optimizer asgd --emb_lr 0 --dis_sampling .7 --device cuda:2 --n_refinement 10
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
-# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id new_lr.5_p.5 --dis_sampling .5 --device cuda:1 --n_epochs 5 --emb_lr .5
+# python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id new_lr0_adam_p.7 --dis_sampling .7 --device cuda:3 --emb_lr 0 --random_start 10
+# python learn_map_w_given_emb.py --langs en_ja_de_es_fr_it_pt_random --exp_name seven_w_enlike --exp_id new_lr0_adam_p.7 --dis_sampling .7 --device cuda:3 --emb_lr 0 --random_start 10
 # python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_rmsprop_p.7 --langs de_es_random --device cuda:3 --dis_sampling .7 --emb_optimizer rmsprop --ref_optimizer rmsprop
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr.5_p1_start5 --langs de_es_random --device cuda:2 --emb_lr .5 --dis_sampling 1 --random_start 5 --n_epochs 10
+# python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr0_adam_p1_res3 --langs de_es_random --device cuda:3 --emb_lr 0 --dis_sampling 1 --random_start 10 --ref_emb_start 3
+# python learn_map_w_given_emb.py --exp_name three_en_like/de_es --exp_id new_lr.3_adam_p1 --langs de_es_random --device cuda:1 --emb_lr .3 --dis_sampling 1
+# python learn_map_w_given_emb.py --exp_name en_ja_enlike --exp_id new_lr0_adam_p1 --langs en_ja_random --device cuda:1 --emb_lr 0 --dis_sampling 1
+# python learn_map_w_given_emb.py --exp_name en_ja_fr_enlike --exp_id new_lr0_adam_p1 --langs en_ja_fr_random --device cuda:0 --emb_lr 0 --dis_sampling 1 --n_refinement 10
 
 import os
 import time
@@ -50,6 +54,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 parser.add_argument("--emb_init", type=str, default='load', help="initialize type of embeddings")
 parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
 parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--save_random", type=bool, default=False, help="save random embedding or not)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -62,7 +67,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
-parser.add_argument("--random_start", type=int, default=0, help="Number of epochs")
+parser.add_argument("--random_start", type=int, default=0, help="epoch which start random lerning")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
@@ -75,6 +80,7 @@ parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--ref_emb_start", type=int, default=0, help="epoch which start random lerning")
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
 parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="refine optimizer")
@@ -166,7 +172,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no_target')
+        evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
 
         # save best model / end of epoch
@@ -204,7 +210,8 @@ if params.n_refinement:
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
             n_words_ref += trainer.refine_step(stats)
-            n_words_ref += trainer.refine_emb_step(stats)
+            if n_epoch >= params.ref_emb_start:
+                n_words_ref += trainer.refine_emb_step(stats)
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
@@ -227,38 +234,23 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
-        # # optimize mapping
-        # tic = time.time()
-        # n_words_ref = 0
-        # stats = {'REFINE_COSTS': []}
-        # for n_iter in range(params.ref_steps):
-        #     # mpsr training step
-        #     n_words_ref += trainer.refine_step(stats)
-        #     # log stats
-        #     if n_iter % 500 == 0:
-        #         stats_str = [('REFINE_COSTS', 'Refine loss')]
-        #         stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-        #                      for k, v in stats_str if len(stats[k])]
-        #         stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
-        #         logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
-        #         # reset
-        #         tic = time.time()
-        #         n_words_ref = 0
-        #         for k, _ in stats_str:
-        #             del stats[k][:]
-
-        # # embeddings evaluation
-        # to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
-        # evaluator.all_eval(to_log, params.eval_type)
-
-        # # JSON log / save best model / end of epoch
-        # # logger.info("__log__:%s", json.dumps(to_log))
-        # trainer.save_best(to_log, VALIDATION_METRIC)
-        # trainer.update_lr(to_log, VALIDATION_METRIC, mode='ref')
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-to_log = OrderedDict()
-trainer.reload_best()
-evaluator.all_eval(to_log, params.last_eval)
-evaluator.eval_dis(to_log)
+# to_log = OrderedDict()
+# trainer.reload_best()
+# evaluator.all_eval(to_log, params.last_eval)
+# evaluator.eval_dis(to_log)
+
+if params.save_random:
+    logger.info('The best metric is %.4f, %s epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
+    logger.info('Writing source embeddings to %s ...', path)
+    torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
+
+    for i in range(params.langnum-1):
+        W = mappings.linear[i].weight.detach().cpu().numpy()
+        path = os.path.join(params.exp_path, 'best_mapping{}.pth'.format(i+1))
+        logger.info('* Saving the generator to %s ...', path)
+        torch.save(W, path)
+
 logger.info('end of the examination')

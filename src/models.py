@@ -53,15 +53,15 @@ class Mapping(nn.Module):
         self.map_beta = params.map_beta
         self.langnum = params.langnum
 
-        self.mappings = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
+        self.linear = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
-                # self.mappings[i].weight.data = torch.diag(torch.ones(self.emb_dim))
-                self.mappings[i].weight.data = torch.diag(torch.ones(params.emb_dim))
+                # self.linear[i].weight.data = torch.diag(torch.ones(self.emb_dim))
+                self.linear[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
     def forward(self, x, i):
         """map into target space"""
-        return self.mappings[i](x) if 0 <= i < self.langnum-1 else x
+        return self.linear[i](x) if 0 <= i < self.langnum-1 else x
 
     def orthogonalize(self):
         """
@@ -69,8 +69,8 @@ class Mapping(nn.Module):
         """
         beta = self.map_beta
         for i in range(self.langnum-1):
-            W = self.mappings[i].weight.detach()
-            self.mappings[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
+            W = self.linear[i].weight.detach()
+            self.linear[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
 
 class Embedding(nn.Module):
     """mapping and embeddings"""

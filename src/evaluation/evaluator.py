@@ -109,6 +109,7 @@ class Evaluator:
         tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
+            if results is None: return
             # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
             for k, v in results:
                 if '{}-{}'.format(k, method) in to_log:
@@ -256,7 +257,7 @@ class Evaluator:
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
                 if i < langnum-1:
-                    preds = self.discriminator(self.mapping.mappings[i](emb).detach())
+                    preds = self.discriminator(self.mapping.linear[i](emb).detach())
                 else:
                     preds = self.discriminator(emb)
                 preds_[i].extend(torch.exp(preds).detach().cpu().tolist())
