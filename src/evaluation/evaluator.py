@@ -247,23 +247,20 @@ class Evaluator:
         """
         bs = 128
         langnum = self.langnum
-        preds_ = [[] for _ in range(langnum)]
+        real_preds = [[] for _ in range(langnum)]
+        fake_preds = [[] for _ in range(langnum)]
         pred_ = [0]*langnum
         confusion_matrix = [[0]*langnum for _ in range(langnum)]
-        for i in range(langnum):
-            self.discriminators[i].eval()
+        for i in range(langnum): self.discriminators[i].eval()
 
-        for i in range(langnum):
+        for i in range(langnum-1):
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
-                if i < langnum-1:
-                    preds = self.discriminator(self.mapping.models[i](emb).detach())
-                else:
-                    preds = self.discriminator(emb)
-                preds_[i].extend(torch.exp(preds).detach().cpu().tolist())
+                preds = self.discriminator(self.mapping.models[i](emb).detach())
+                real_preds[i].extend(torch.exp(preds).detach().cpu().tolist())
             # pred_[i] = np.mean(preds_[i])
-            pred_[i] = np.mean([x[i] for x in preds_[i]])
-            for x in preds_[i]:
+            pred_[i] = np.mean([x[i] for x in real_preds[i]])
+            for x in real_preds[i]:
                 max_prob = max(x)
                 for l in range(langnum):
                     if x[l] == max_prob:
