@@ -9,11 +9,12 @@
 import torch
 import numpy as np
 from torch import nn
+from torch.nn import functional as F
 from scipy.stats import truncnorm
 from .utils import load_embeddings, normalize_embeddings
 
 class Discriminator(nn.Module):
-    
+
     def __init__(self, params):
         super(Discriminator, self).__init__()
 
@@ -23,7 +24,7 @@ class Discriminator(nn.Module):
         self.dis_dropout = params.dis_dropout
         self.dis_input_dropout = params.dis_input_dropout
 
-        self.models = nn.ModuleList()
+        models = []
         for l in range(params.langnum):
             layers = [nn.Dropout(self.dis_input_dropout)]
             for i in range(self.dis_layers + 1):
@@ -34,7 +35,8 @@ class Discriminator(nn.Module):
                     layers.append(nn.LeakyReLU(0.2))
                     layers.append(nn.Dropout(self.dis_dropout))
             layers.append(nn.Sigmoid())
-            self.models.append(nn.Sequential(*layers))
+            models.append(nn.Sequential(*layers))
+        self.models = nn.ModuleList(models)
 
     def forward(self, x, i):
         assert x.dim() == 2 and x.size(1) == self.emb_dim
@@ -52,12 +54,13 @@ class Mapping(nn.Module):
         self.models = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
-                # self.models[i].weight.data = torch.diag(torch.ones(self.emb_dim))
                 self.models[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
-    def forward(self, x, i):
+    def forward(self, x, i, rev=False):
         """map into target space"""
-        return self.models[i](x) if 0 <= i < self.langnum-1 else x
+        if i == -1 or i == self.langnum-1: return x
+        if not rev: return self.models[i](x)
+        return F.linear(x, self.models[i].weight.t())
 
     def orthogonalize(self):
         """
@@ -99,7 +102,7 @@ class Embedding(nn.Module):
                     _embs[-1] *= params.emb_norm
             else:
                 dicos[i], _embs[i] = load_embeddings(params, i)
-        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
+        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(self.langnum)])
         for i in range(self.langnum):
             self.embs[i].weight.data = _embs[i]
             if i == self.langnum-1 and params.learnable:

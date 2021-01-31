@@ -74,9 +74,8 @@ class Trainer():
                 logger.info(param.size())
             logger.info(embedding.embs[0].weight.requires_grad)
             logger.info('discriminator')
-            for i in range(self.langnum):
-                for param in discriminators.parameters():
-                    logger.info(param.size())
+            for param in discriminators.parameters():
+                logger.info(param.size())
             logger.info(discriminators.models[0][1].weight.requires_grad)
 
         # best validation score
@@ -98,8 +97,10 @@ class Trainer():
 
         # get ids
         if self.params.test:
-            src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
-            tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+            # src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+            # tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+            src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
+            tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
         elif rv and i == langnum-1:
             src_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
             tgt_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
@@ -108,8 +109,7 @@ class Trainer():
             tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
-        src_emb = self.mapping(self.embs[i](src_ids), i)
-        if j < self.langnum-1: src_emb = F.linear(src_emb, self.mapping.models[j].weight.t())
+        src_emb = self.mapping(self.mapping(self.embs[i](src_ids), i), j, rev=True)
         tgt_emb = self.embs[j](tgt_ids)
 
         # if self.params.test:
@@ -126,7 +126,7 @@ class Trainer():
         y[:bs] = 1 - self.params.dis_smooth
         y[bs:] = self.params.dis_smooth
         y = y.to(self.params.device)
-        
+
         return x, y
 
     def get_refine_xy(self, i, j):
@@ -142,9 +142,7 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        x = self.mapping(self.embs[i](src_ids), i)
-        if j < self.langnum-1:
-            x = F.linear(x, self.mapping.models[j].weight.t())
+        x = self.mapping(self.mapping(self.embs[i](src_ids), i), j, rev=True)
         y = self.embs[j](tgt_ids)
 
         return x, y
@@ -153,24 +151,23 @@ class Trainer():
         """
         Train the discriminator.
         """
-        for i in range(self.langnum):
-            self.discriminators.models[i].train()
+        self.discriminators.train()
 
         # loss
         loss = 0
         # for each target language
-        for i in range(self.langnum):
+        for j in range(self.langnum):
             # random select a source language
-            j = random.choice(list(range(0, self.langnum)))
+            i = random.choice(list(range(self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators(x, i)
+            preds = self.discriminators(x.detach(), j)
             loss += F.binary_cross_entropy(preds, y)
-        
+
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.discriminators.models[0][4].weight[0][:10])
-            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            logger.info(self.discriminators.models[0][1].weight[0][:10])
+            logger.info(self.discriminators.models[1][1].weight[0][:10])
             # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
             # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
             # logger.info(preds[:10])
@@ -187,8 +184,7 @@ class Trainer():
         self.dis_optimizer.zero_grad()
         loss.backward()
         self.dis_optimizer.step()
-        for i in range(self.langnum):
-            torch.nn.utils.clip_grad_norm_(self.discriminators.models[i].parameters(), self.params.clip_grad)
+        # torch.nn.utils.clip_grad_norm_(self.discriminators.parameters(), self.params.clip_grad)
 
         if self.params.test:
             logger.info('after_dis')
@@ -197,8 +193,8 @@ class Trainer():
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
             # logger.info(torch.exp(new_preds[:10]))
             # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
-            logger.info(self.discriminators.models[0][4].weight[0][:10])
-            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            logger.info(self.discriminators.models[0][1].weight[0][:10])
+            logger.info(self.discriminators.models[1][1].weight[0][:10])
             # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
             # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
             # print(torch.norm(self.discriminator.layers[1].weight))
@@ -209,18 +205,17 @@ class Trainer():
         """
         Fooling discriminator training step.
         """
-        for i in range(self.langnum):
-            self.discriminators.models[i].eval()
+        self.discriminators.eval()
 
         # loss
         loss = 0
-        # for each target language
+        # for each source language
         for i in range(self.langnum):
-            # random select a source language
+            # random select a target language
             j = random.choice(list(range(0, self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators(x, i)
+            preds = self.discriminators(x, j)
             loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
@@ -232,12 +227,12 @@ class Trainer():
         if mode == 'map':
             self.map_optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
+            # torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
             self.map_optimizer.step()
         elif mode == 'emb':
             self.emb_optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
+            # torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
             self.emb_optimizer.step()
 
 
@@ -248,10 +243,10 @@ class Trainer():
         if self.params.test:
             logger.info('after_%s', mode)
             # print(torch.norm(self.discriminator.layers[1].weight))
-            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
-            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
-            logger.info(self.discriminators.models[0][4].weight[0][:10])
-            logger.info(self.discriminators.models[1][4].weight[0][:10])
+            logger.info(torch.norm(self.discriminators.models[0][1].weight[0]))
+            logger.info(torch.norm(self.discriminators.models[1][1].weight[0]))
+            # logger.info(self.discriminators.models[0][4].weight[0][:10])
+            # logger.info(self.discriminators.models[1][4].weight[0][:10])
             # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
             # for i in range(self.langnum):
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
@@ -261,8 +256,8 @@ class Trainer():
         #     logger.info('Mapping loss %.4f', new_loss)
         if mode == 'map':
             self.mapping.orthogonalize()
-            if self.params.test:
-                logger.info('orthogonalized')
+            # if self.params.test:
+                # logger.info('orthogonalized')
                 # x, y = self.get_dis_xy()
             #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
                 # logger.info(self.mapping.models[0].weight[0][:10])
