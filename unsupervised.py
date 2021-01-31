@@ -41,7 +41,7 @@ parser.add_argument("--last_eval", type=str, default="all", help="evaluation typ
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -54,7 +54,7 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=5, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
@@ -78,7 +78,7 @@ parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine op
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
-parser.add_argument("--dico_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -106,7 +106,6 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # build model / trainer / evaluator
 params.test = False
 params.langs = params.langs.split('_')
-params.random_vocab = False
 params.learnable = False
 params.langnum = len(params.langs)
 params.embpaths = []
@@ -164,8 +163,9 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'only_target')
-        # evaluator.eval_dis(to_log)
+        evaluator.all_eval(to_log, 'all')
+        evaluator.eval_dis(to_log)
+        logger.info("__log__:%s", json.dumps(to_log))
 
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
@@ -219,6 +219,7 @@ if params.n_refinement:
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
         evaluator.all_eval(to_log, params.eval_type)
+        logger.info("__log__:%s", json.dumps(to_log))
 
         # JSON log / save best model / end of epoch
         # logger.info("__log__:%s", json.dumps(to_log))

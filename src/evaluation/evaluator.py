@@ -49,7 +49,7 @@ class Evaluator:
         ws_scores = get_wordsim_scores(self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy())
         if ws_scores is not None:
             ws_monolingual_scores = np.mean(list(ws_scores.values()))
-            logger.info("Monolingual word similarity score average: %.5f", ws_monolingual_scores)
+            logger.info("%s Monolingual word similarity score average: %.5f", self.params.langs[i], ws_monolingual_scores)
             # to_log['ws_monolingual_scores'] = ws_monolingual_scores
             # to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
 
@@ -92,7 +92,7 @@ class Evaluator:
         )
         if src_tgt_ws_scores is None: return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
-        logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
+        logger.info("%s-%s Cross-lingual word similarity score average: .%5f", self.params.langs[i], self.params.langs[j], ws_crosslingual_scores)
         # to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         for k, v in src_tgt_ws_scores.items():
             if 'src_tgt_' + k in to_log:
@@ -178,7 +178,7 @@ class Evaluator:
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
         # build dictionary
-        for dico_method in ['nn', 'csls_knn_10']:
+        for dico_method in ['csls_knn_10']:
             dico_build = 'S2T'
             dico_max_size = self.params.metric_size
             # temp params / dictionary generation
@@ -198,7 +198,7 @@ class Evaluator:
             else:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
-            logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
+            logger.info("%s-%s Mean cosine (%s method, %s build, %i max size): %.5f", self.params.langs[i], self.params.langs[j], dico_method, _params.dico_build, dico_max_size, mean_cosine)
             if 'mean_cosine-{}-{}-{}'.format(dico_method, _params.dico_build, dico_max_size) in to_log:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)].append(mean_cosine)
             else:
@@ -210,12 +210,10 @@ class Evaluator:
         """
         self.mapping.eval()
         for i in range(self.langnum):
-            logger.info('evaluate %s', self.params.langs[i])
             if eval_type == 'no_target':
                 if i == self.langnum-1: continue
                 for j in range(self.langnum-1):
                     if i == j: continue
-                    logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
                     self.crosslingual_wordsim(i, j, to_log)
                     self.word_translation(i, j, to_log)
                     # self.sent_translation(i, j, to_log)
@@ -223,7 +221,6 @@ class Evaluator:
                 self.monolingual_wordsim(i)
                 for j in range(self.langnum):
                     if i == j: continue
-                    logger.info('evaluate %s %s', self.params.langs[i], self.params.langs[j])
                     self.crosslingual_wordsim(i, j, to_log)
                     self.word_translation(i, j, to_log)
                     # self.sent_translation(i, j, to_log)
@@ -232,14 +229,29 @@ class Evaluator:
                 self.crosslingual_wordsim(i, self.langnum-1, to_log)
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
-            # for j in range(self.langnum):
-                # if i == j: continue
-            if i < self.langnum - 1:
-                self.dist_mean_cosine(to_log, i, self.langnum-1)
+        for i in range(self.langnum):
+            for j in range(i+1, self.langnum):
+                self.dist_mean_cosine(to_log, i, j)
         for k in to_log:
             if isinstance(to_log[k], list):
                 to_log[k] = sum(to_log[k])/len(to_log[k])
-        logger.info("__log__:%s", json.dumps(to_log))
+
+    def print_diseval(self, to_log, i, real_preds, fake_preds):
+        lang = self.params.langs[i]
+        real_pred = np.mean(real_preds)
+        fake_pred = np.mean(fake_preds)
+        logger.info("%s Discriminator average real / fake predictions: %.5f / %.5f", lang, real_pred, fake_pred)
+
+        real_accu = np.mean([x < 0.5 for x in real_preds])
+        fake_accu = np.mean([x >= 0.5 for x in fake_preds])
+        dis_accu = ((fake_accu * len(fake_preds) + real_accu * len(real_preds)) / (len(real_preds) + len(fake_preds)))
+        logger.info("%s Discriminator real / fake / global accuracy: %.5f / %.5f / %.5f", lang, real_accu, fake_accu, dis_accu)
+
+        to_log[f'{lang}_dis_accu'] = dis_accu
+        to_log[f'{lang}_dis_fake_pred'] = fake_pred
+        to_log[f'{lang}_dis_real_pred'] = real_pred
+
+        return dis_accu
 
     def eval_dis(self, to_log):
         """
@@ -247,33 +259,37 @@ class Evaluator:
         """
         bs = 128
         langnum = self.langnum
-        real_preds = [[] for _ in range(langnum)]
-        fake_preds = [[] for _ in range(langnum)]
-        pred_ = [0]*langnum
-        confusion_matrix = [[0]*langnum for _ in range(langnum)]
-        for i in range(langnum): self.discriminators[i].eval()
+        self.discriminators.eval()
 
+        dis_accus = [0]*langnum
         for i in range(langnum-1):
+            real_preds, fake_preds = [], []
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
-                preds = self.discriminator(self.mapping.models[i](emb).detach())
-                real_preds[i].extend(torch.exp(preds).detach().cpu().tolist())
-            # pred_[i] = np.mean(preds_[i])
-            pred_[i] = np.mean([x[i] for x in real_preds[i]])
-            for x in real_preds[i]:
-                max_prob = max(x)
-                for l in range(langnum):
-                    if x[l] == max_prob:
-                        confusion_matrix[i][l] += 1
+                preds = self.discriminators(emb.detach(), i)
+                real_preds.extend(preds.detach().cpu().tolist())
 
-            logger.info("Discriminator %s predictions: %.5f", self.params.langs[i], pred_[i])
+            for j in range(0, self.embs[-1].num_embeddings, bs):
+                emb = self.mapping(self.embs[-1].weight[j:j + bs].detach(), i, rev=True)
+                preds = self.discriminators(emb.detach(), i)
+                fake_preds.extend(preds.detach().cpu().tolist())
 
-        for i in range(langnum):
-            for j in range(langnum):
-                logger.info("Discriminator true %s pred %s: %.5f", self.params.langs[i], self.params.langs[j], confusion_matrix[i][j]/sum(confusion_matrix[i]))
-        dis_accu = sum(a[i] for i, a in enumerate(confusion_matrix))/sum(sum(a) for a in confusion_matrix)
+            dis_accus[i] = self.print_diseval(to_log, i, real_preds, fake_preds)
 
-        logger.info("Discriminator global accuracy: %.5f", dis_accu)
-        to_log['dis_accu'] = dis_accu
+        real_preds, fake_preds = [], []
+        for j in range(0, self.embs[-1].num_embeddings, bs):
+            emb = self.embs[-1].weight[j:j + bs].detach()
+            preds = self.discriminators(emb, langnum-1)
+            real_preds.extend(preds.detach().cpu().tolist())
+        for i in range(langnum-1):
+            for j in range(0, self.embs[i].num_embeddings//(langnum-1), bs):
+                emb = self.mapping(self.embs[i].weight[j:j + bs].detach(), i)
+                preds = self.discriminators(emb, langnum-1)
+                fake_preds.extend(preds.detach().cpu().tolist())
+
+        dis_accus[-1] = self.print_diseval(to_log, -1, real_preds, fake_preds)
+
+        avg_dis_accu = np.mean(dis_accus)
+        to_log['dis_accu'] = avg_dis_accu
         # to_log['dis_src_pred'] = pred
         # to_log['dis_tgt_pred'] = pred

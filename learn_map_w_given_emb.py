@@ -167,7 +167,8 @@ if params.adversarial:
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
         evaluator.all_eval(to_log, 'no_target')
-        # evaluator.eval_dis(to_log)
+        evaluator.eval_dis(to_log)
+        logger.info("__log__:%s", json.dumps(to_log))
 
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
@@ -223,7 +224,7 @@ if params.n_refinement:
         evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
-        # logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
