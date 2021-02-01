@@ -6,10 +6,11 @@
 # LICENSE file in the root directory of this source tree.
 #
 # python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
-# python unsupervised.py --exp_name mat_five_langs --exp_id fr_p.3 --langs de_es_it_pt_fr --device cuda:2 --n_epochs 5 --dis_sampling .3
-# python unsupervised.py --exp_name mat_six_langs --exp_id all.3 --langs de_es_it_pt_fr --device cuda:3 --n_epochs 5 --dis_sampling .3 --eval_type no_target --last_eval no_target
+# python unsupervised.py --exp_name fives/five+en --exp_id fr_p.3 --langs de_es_it_pt_fr_en --device cuda:0
+# python unsupervised.py --exp_name six_langs --exp_id all.3 --langs de_es_it_pt_fr --device cuda:3 --n_epochs 5 --dis_sampling .3 --eval_type no_target --last_eval no_target
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
 # python unsupervised.py --exp_name mat_six_langs --exp_id all --langs de_es_it_fr_pt_en --device cuda:2 --eval_type all --last_eval all
+# python unsupervised.py --exp_name sevens/seven_langs --exp_id mat --langs ja_de_es_it_fr_pt_en --device cuda:0 --eval_type no --last_eval all
 # python unsupervised.py --exp_name mat_three_langs --exp_id de_es_en --langs de_es_en --device cuda:0
 import os
 import time
@@ -35,7 +36,7 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--eval_type", type=str, default="all", help="evaluation type during training")
+parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
@@ -163,7 +164,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'all')
+        evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
         logger.info("__log__:%s", json.dumps(to_log))
 
@@ -226,10 +227,11 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-# to_log = OrderedDict()
-# trainer.reload_best()
-# evaluator.all_eval(to_log, params.last_eval)
+to_log = OrderedDict()
+trainer.reload_best()
+evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
+logger.info("__log__:%s", json.dumps(to_log))
 logger.info('end of the examination')
 # export embeddings
 # if params.export:
