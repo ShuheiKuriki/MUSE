@@ -92,7 +92,7 @@ class Evaluator:
         )
         if src_tgt_ws_scores is None: return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
-        logger.info("Cross-lingual word similarity score average: .%5f", ws_crosslingual_scores)
+        logger.info("%s-%s Cross-lingual word similarity score average: .%5f", self.params.langs[i], self.params.langs[j], ws_crosslingual_scores)
         # to_log['ws_crosslingual_scores'] = ws_crosslingual_scores
         for k, v in src_tgt_ws_scores.items():
             if 'src_tgt_' + k in to_log:
@@ -179,7 +179,7 @@ class Evaluator:
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 
         # build dictionary
-        for dico_method in ['nn', 'csls_knn_10']:
+        for dico_method in ['csls_knn_10']:
             dico_build = 'S2T'
             dico_max_size = self.params.metric_size
             # temp params / dictionary generation
@@ -199,7 +199,7 @@ class Evaluator:
             else:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
-            logger.info("Mean cosine (%s method, %s build, %i max size): %.5f", dico_method, _params.dico_build, dico_max_size, mean_cosine)
+            logger.info("%s-%s Mean cosine (%s method, %s build, %i max size): %.5f", self.params.langs[i], self.params.langs[j], dico_method, _params.dico_build, dico_max_size, mean_cosine)
             if 'mean_cosine-{}-{}-{}'.format(dico_method, _params.dico_build, dico_max_size) in to_log:
                 to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)].append(mean_cosine)
             else:
@@ -233,14 +233,10 @@ class Evaluator:
                 self.crosslingual_wordsim(i, self.langnum-1, to_log)
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
-            # for j in range(self.langnum):
-                # if i == j: continue
-            if i < self.langnum - 1:
-                self.dist_mean_cosine(to_log, i, self.langnum-1)
+        for i in range(self.langnum-1):
+            for j in range(i+1, self.langnum): self.dist_mean_cosine(to_log, i, j)
         for k in to_log:
-            if isinstance(to_log[k], list):
-                to_log[k] = sum(to_log[k])/len(to_log[k])
-        logger.info("__log__:%s", json.dumps(to_log))
+            if isinstance(to_log[k], list): to_log[k] = sum(to_log[k])/len(to_log[k])
 
     def eval_dis(self, to_log):
         """

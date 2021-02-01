@@ -35,16 +35,15 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--eval_type", type=str, default="all", help="evaluation type during training")
+parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
+parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--learnable", type=bool, default=False, help="learn last emb")
-
-parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -80,7 +79,7 @@ parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine op
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
-parser.add_argument("--dico_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -106,7 +105,6 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
-params.test = False
 params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
@@ -163,7 +161,8 @@ if params.adversarial:
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
         evaluator.all_eval(to_log, 'no')
-        # evaluator.eval_dis(to_log)
+        evaluator.eval_dis(to_log)
+        logger.info("__log__:%s", json.dumps(to_log))
 
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
@@ -219,13 +218,14 @@ if params.n_refinement:
         evaluator.all_eval(to_log, params.eval_type)
 
         # JSON log / save best model / end of epoch
-        # logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-# to_log = OrderedDict()
-# trainer.reload_best()
-# evaluator.all_eval(to_log, params.last_eval)
+to_log = OrderedDict()
+trainer.reload_best()
+evaluator.all_eval(to_log, params.last_eval)
+logger.info("__log__:%s", json.dumps(to_log))
 # evaluator.eval_dis(to_log)
 logger.info('end of the examination')
 # export embeddings
