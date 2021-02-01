@@ -4,8 +4,8 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-#
-# python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0 
+
+# python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0
 # python unsupervised.py --exp_name fives/five+en --exp_id fr_p.3 --langs de_es_it_pt_fr_en --device cuda:0
 # python unsupervised.py --exp_name six_langs --exp_id all.3 --langs de_es_it_pt_fr --device cuda:3 --n_epochs 5 --dis_sampling .3 --eval_type no_target --last_eval no_target
 # python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
@@ -38,12 +38,13 @@ parser.add_argument("--device", type=str, default='cuda:0', help="select device"
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
+parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
+parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
 parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
-parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -63,7 +64,7 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
 parser.add_argument("--random_start", type=int, default=100, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
@@ -105,9 +106,7 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
-params.test = False
 params.langs = params.langs.split('_')
-params.learnable = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -205,8 +204,7 @@ if params.n_refinement:
             # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-                             for k, v in stats_str if len(stats[k]) > 0]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k]) > 0]
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
                 logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
                 # reset

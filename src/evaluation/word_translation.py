@@ -29,7 +29,7 @@ def load_identical_char_dico(word2id1, word2id2):
         raise Exception("No identical character strings were found. "
                         "Please specify a dictionary.")
 
-    logger.info("Found %i pairs of identical character strings." % len(pairs))
+    logger.info("Found %i pairs of identical character strings.", len(pairs))
 
     # sort the dictionary by source word frequencies
     pairs = sorted(pairs, key=lambda x: word2id1[x[0]])
@@ -46,7 +46,7 @@ def load_dictionary(path, word2id1, word2id2):
     Return a torch tensor of size (n, 2) where n is the size of the
     loader dictionary, and sort it by source word frequency.
     """
-    assert os.path.isfile(path)
+    if not os.path.isfile(path): return None
 
     pairs = []
     not_found = 0
@@ -70,9 +70,7 @@ def load_dictionary(path, word2id1, word2id2):
 
     logger.info("Found %i pairs of words in %s (%i unique). "
                 "%i other pairs contained at least one unknown word "
-                "(%i in lang1, %i in lang2)"
-                % (len(pairs), path, len(set([x for x, _ in pairs])),
-                   not_found, not_found1, not_found2))
+                "(%i in lang1, %i in lang2)", len(pairs), path, len(set([x for x, _ in pairs])), not_found, not_found1, not_found2)
 
     # sort the dictionary by source word frequencies
     pairs = sorted(pairs, key=lambda x: word2id1[x[0]])
@@ -94,6 +92,7 @@ def get_word_translation_accuracy(lang1, word2id1, emb1, lang2, word2id2, emb2, 
     else:
         path = dico_eval
     dico = load_dictionary(path, word2id1, word2id2)
+    if dico is None: return None
     dico = dico.cuda() if emb1.is_cuda else dico
 
     assert dico[:, 0].max() < emb1.size(0)
@@ -151,8 +150,7 @@ def get_word_translation_accuracy(lang1, word2id1, emb1, lang2, word2id2, emb2, 
             matching[src_id] = min(matching.get(src_id, 0) + _matching[i], 1)
         # evaluate precision@k
         precision_at_k = 100 * np.mean(list(matching.values()))
-        logger.info("%i source words - %s - Precision at k = %i: %f" %
-                    (len(matching), method, k, precision_at_k))
+        logger.info("%i source words - %s - Precision at k = %i: %f", len(matching), method, k, precision_at_k)
         results.append(('precision_at_%i' % k, precision_at_k))
 
     return results

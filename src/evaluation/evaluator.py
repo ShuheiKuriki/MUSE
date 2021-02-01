@@ -109,6 +109,7 @@ class Evaluator:
         tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         for method in ['nn', 'csls_knn_10']:
             results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
+            if results is None: return
             # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
             for k, v in results:
                 if '{}-{}'.format(k, method) in to_log:

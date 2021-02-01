@@ -7,13 +7,14 @@
 #
 
 # python evaluate_multi.py --langs de_es_fr_it_pt --exp_name five_w_enlike2 --exp_id lr.1_p.4_eval --langlist de_es_fr_it_pt --map_path dumped/five_w_enlike2/lr.1_p.4
-# python evaluate_multi.py --langs de_es_random --exp_name learn_map_w_given_by_en_emb2/de_es --exp_id new_lr.3_p1_eval --langlist de_es_fr_it_pt --map_path dumped/learn_map_w_given_by_en_emb2/new_lr.3_p1/de_es
+# python evaluate_multi.py --langs ja_de_es_it_fr_pt_en --exp_name sevens/seven_langs --exp_id mat_eval --langlist ja_de_es_it_fr_pt_en --map_path dumped/sevens/seven_langs/mat
 
 import os
 import argparse
 from collections import OrderedDict
 
 import torch
+import json
 
 from src.utils import bool_flag, initialize_exp
 from src.models import build_model
@@ -36,6 +37,7 @@ parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning e
 parser.add_argument("--map_path", type=str, default="dumped/three_langs/", help="Experiment name")
 # reload pre-trained embeddings
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
+parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 # training refinement
@@ -59,12 +61,12 @@ params.metric_size = 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 params.test = False
-params.langs = params.langs.split('_')+['en']
+params.langs = params.langs.split('_')
 langlist = params.langlist.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
-for i in range(params.langnum):
-    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+for l in range(params.langnum):
+    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[l]))
 # lang_list = ['fr', 'it', 'es', 'de', 'pt', 'en']
 # build logger / model / trainer / evaluator
 logger = initialize_exp(params)
@@ -72,24 +74,18 @@ mapping, embedding, _ = build_model(params, False)
 trainer = Trainer(mapping, embedding, None, params)
 evaluator = Evaluator(trainer)
 
-if params.langs[0] != 'en':
-    src_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[0])+1))
+for l in range(params.langnum-1):
+    src_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(l+1))
     logger.info('* Reloading the model from %s ...', src_path)
     assert os.path.isfile(src_path)
-    W = mapping.models[0].weight.detach()
+    W = mapping.models[l].weight.detach()
     W.copy_(torch.from_numpy(torch.load(src_path)).type_as(W))
-
-if params.langs[1] != 'en':
-    tgt_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(langlist.index(params.langs[1])+1))
-    logger.info('* Reloading the model from %s ...', tgt_path)
-    assert os.path.isfile(tgt_path)
-    W = mapping.models[1].weight.detach()
-    W.copy_(torch.from_numpy(torch.load(tgt_path)).type_as(W))
 
 # run evaluations
 to_log = OrderedDict()
 
-evaluator.all_eval(to_log, 'no_target')
+evaluator.all_eval(to_log, 'all')
+logger.info("__log__:%s", json.dumps(to_log))
 
 # for n_refine in range(params.n_refinement):
 #     trainer.build_dictionary()
@@ -99,11 +95,11 @@ evaluator.all_eval(to_log, 'no_target')
 # to_log = OrderedDict()
 # evaluator.all_eval(to_log, 'no_target')
 
-for n_refine in range(params.n_refinement):
-    trainer.procrustes2(1)
-    logger.info('End of refine %i.\n', n_refine)
+# for n_refine in range(params.n_refinement):
+    # trainer.procrustes2(1)
+    # logger.info('End of refine %i.\n', n_refine)
 
-to_log = OrderedDict()
-evaluator.all_eval(to_log, 'no_target')
+# to_log = OrderedDict()
+# evaluator.all_eval(to_log, 'no_target')
 
 logger.info('end of the examination')
