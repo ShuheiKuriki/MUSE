@@ -209,13 +209,18 @@ class Trainer():
 
         # loss
         loss = 0
-        # for each source language
-        for i in range(self.langnum):
-            # random select a target language
-            j = random.choice(list(range(0, self.langnum)))
-
-            x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators(x, j)
+        if mode == 'map':
+            # for each source language
+            for i in range(self.langnum):
+                # random select a target language
+                j = random.choice(list(range(self.langnum)))
+                x, y = self.get_dis_xy(i, j)
+                preds = self.discriminators(x, j)
+                loss += F.binary_cross_entropy(preds, 1-y)
+        elif mode == 'emb':
+            i = random.choice(list(range(self.langnum-1)))
+            x, y = self.get_dis_xy(i, self.langnum-1)
+            preds = self.discriminators(x, self.langnum-1)
             loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
@@ -229,48 +234,32 @@ class Trainer():
             loss.backward()
             # torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
             self.map_optimizer.step()
+            self.mapping.orthogonalize()
         elif mode == 'emb':
             self.emb_optimizer.zero_grad()
             loss.backward()
             # torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
             self.emb_optimizer.step()
 
-
-        # new_x, new_y = self.get_dis_xy()
-        # new_preds = self.discriminator(new_x.detach())
-        # new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
-        # stats['MAP_COSTS'].append(new_loss.detach().item())
         if self.params.test:
             logger.info('after_%s', mode)
             # print(torch.norm(self.discriminator.layers[1].weight))
             logger.info(torch.norm(self.discriminators.models[0][1].weight[0]))
             logger.info(torch.norm(self.discriminators.models[1][1].weight[0]))
-            # logger.info(self.discriminators.models[0][4].weight[0][:10])
-            # logger.info(self.discriminators.models[1][4].weight[0][:10])
-            # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
-            # for i in range(self.langnum):
-                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
-        #     logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.mapping.models[0].weight.grad[0][:10])
-            # logger.info(self.mapping.models[0].weight[0][:10])
-        #     logger.info('Mapping loss %.4f', new_loss)
-        if mode == 'map':
-            self.mapping.orthogonalize()
-            # if self.params.test:
-                # logger.info('orthogonalized')
-                # x, y = self.get_dis_xy()
-            #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
-                # logger.info(self.mapping.models[0].weight[0][:10])
 
         return self.langnum * self.params.batch_size
 
-    def refine_step(self, stats):
+    def refine_step(self, stats, mode='map'):
         # loss
         loss = 0
-        langnum = self.params.langnum
-        for i in range(langnum):
-            j = random.choice(list(range(0, langnum)))
-            x, y = self.get_refine_xy(i, j)
+        if mode == 'map':
+            for i in range(self.langnum):
+                j = random.choice(list(range(self.langnum)))
+                x, y = self.get_refine_xy(i, j)
+                loss += F.mse_loss(x, y)
+        elif mode == 'emb':
+            i = random.choice(list(range(self.langnum-1)))
+            x, y = self.get_refine_xy(i, self.langnum-1)
             loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():
@@ -279,33 +268,17 @@ class Trainer():
 
         stats['REFINE_COSTS'].append(loss.item())
         # optim
-        self.ref_optimizer.zero_grad()
-        loss.backward()
-        self.ref_optimizer.step()
+        if mode == 'map':
+            self.ref_optimizer.zero_grad()
+            loss.backward()
+            self.ref_optimizer.step()
+            self.mapping.orthogonalize()
+        elif mode == 'emb':
+            self.emb_ref_optimizer.zero_grad()
+            loss.backward()
+            self.emb_ref_optimizer.step()
 
-        self.mapping.orthogonalize()
-
-        return langnum * self.params.batch_size
-
-    def refine_emb_step(self, stats):
-        # loss
-        loss = 0
-        langnum = self.params.langnum
-        j = random.choice(list(range(0, langnum-1)))
-        x, y = self.get_refine_xy(langnum-1, j)
-        loss += F.mse_loss(x, y)
-        # check NaN
-        if (loss != loss).any():
-            logger.error("NaN detected (fool discriminator)")
-            sys.exit()
-
-        stats['REFINE_COSTS'].append(loss.item())
-        # optim
-        self.emb_ref_optimizer.zero_grad()
-        loss.backward()
-        self.emb_ref_optimizer.step()
-
-        return langnum * self.params.batch_size
+        return self.langnum * self.params.batch_size
 
     def load_training_dico(self, dico_train):
         """
@@ -398,7 +371,7 @@ class Trainer():
         if mode == 'map' and 'sgd' not in self.params.map_optimizer: return
         if mode == 'emb' and 'sgd' not in self.params.emb_optimizer: return
         if mode == 'ref' and 'sgd' not in self.params.ref_optimizer: return
-        
+
         old_lr = optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
         if new_lr < old_lr:

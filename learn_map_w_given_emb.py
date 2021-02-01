@@ -10,7 +10,7 @@
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_mix --exp_id lr0_p.5 --emb_lr 0 --dis_sampling .5 --device cuda:2 --n_epochs 3
 # python learn_map_w_given_emb.py --langs en_de_es_fr_it_pt_random --exp_name six_w_enlike --exp_id mat_lr.5_p.3 --dis_sampling .3 --device cuda:3 --n_epochs 10 --emb_lr .5
 # python learn_map_w_given_emb.py --exp_name learn_map_w_given_by_en_emb2/de_pt --exp_id mat_lr.5_adam_p.3 --langs de_pt_random --device cuda:1 --dis_sampling .3 --emb_optimizer sgd --emb_lr .5
-# python learn_map_w_given_emb.py --exp_name learn_map_w_given_emb5/de_es --exp_id new_lr.5_p1_start5 --langs de_es_random --device cuda:2 --emb_lr .5 --dis_sampling 1 --random_start 5 --n_epochs 10
+# python learn_map_w_given_emb.py --exp_name twos/de_es/en-like --exp_id mat_lr.3_adam --langs de_es_random --device cuda:0 --emb_lr 0.3 --dis_sampling 5 --epoch_size 500000
 
 import os
 import time
@@ -43,7 +43,6 @@ parser.add_argument("--langs", type=str, default='es_en', help="Source language"
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
-parser.add_argument("--same_norm", type=bool, default=False, help="arrange norms")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -197,8 +196,8 @@ if params.n_refinement:
         n_words_ref = 0
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
-            n_words_ref += trainer.refine_step(stats)
-            n_words_ref += trainer.refine_emb_step(stats)
+            n_words_ref += trainer.refine_step(stats, mode='map')
+            n_words_ref += trainer.refine_step(stats, mode='emb')
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
