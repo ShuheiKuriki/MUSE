@@ -144,8 +144,6 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
-            if n_epoch >= params.random_start:
-                trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:

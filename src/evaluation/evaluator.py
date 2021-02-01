@@ -230,11 +230,9 @@ class Evaluator:
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
         for i in range(self.langnum):
-            for j in range(i+1, self.langnum):
-                self.dist_mean_cosine(to_log, i, j)
+            for j in range(i+1, self.langnum): self.dist_mean_cosine(to_log, i, j)
         for k in to_log:
-            if isinstance(to_log[k], list):
-                to_log[k] = sum(to_log[k])/len(to_log[k])
+            if isinstance(to_log[k], list): to_log[k] = sum(to_log[k])/len(to_log[k])
 
     def print_diseval(self, to_log, i, real_preds, fake_preds):
         lang = self.params.langs[i]

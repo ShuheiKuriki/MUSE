@@ -112,8 +112,7 @@ params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.p
 params.embpaths = []
 for i in range(params.langnum):
     params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-if params.emb_optimizer == 'sgd':
-    params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)
@@ -137,16 +136,13 @@ if params.adversarial:
 
             # discriminator training
             if params.dis_sampling < 1:
-                if np.random.rand() <= params.dis_sampling:
-                    trainer.dis_step(stats)
+                if np.random.rand() <= params.dis_sampling: trainer.dis_step(stats)
             else:
-                for i in range(int(params.dis_sampling)):
-                    trainer.dis_step(stats)
+                for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(stats, mode='map')
-            if n_epoch >= params.random_start:
-                trainer.gen_step(stats, mode='emb')
+            if n_epoch >= params.random_start: trainer.gen_step(stats, mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -160,12 +156,11 @@ if params.adversarial:
                 # reset
                 tic = time.time()
                 n_words_proc = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+                for k, _ in stats_str: del stats[k][:]
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no_target')
+        evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
         logger.info("__log__:%s", json.dumps(to_log))
 
@@ -187,7 +182,7 @@ if params.adversarial:
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
-    trainer.reload_best()
+    # trainer.reload_best()
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -215,8 +210,7 @@ if params.n_refinement:
                 # reset
                 tic = time.time()
                 n_words_ref = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+                for k, _ in stats_str: del stats[k][:]
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
         evaluator.all_eval(to_log, params.eval_type)
@@ -228,9 +222,9 @@ if params.n_refinement:
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-to_log = OrderedDict()
-trainer.reload_best()
-evaluator.all_eval(to_log, params.last_eval)
-logger.info("__log__:%s", json.dumps(to_log))
+# to_log = OrderedDict()
+# trainer.reload_best()
+# evaluator.all_eval(to_log, params.last_eval)
+# logger.info("__log__:%s", json.dumps(to_log))
 # evaluator.eval_dis(to_log)
 logger.info('end of the examination')
