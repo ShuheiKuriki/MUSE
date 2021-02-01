@@ -102,7 +102,7 @@ class Embedding(nn.Module):
                     _embs[-1] *= params.emb_norm
             else:
                 dicos[i], _embs[i] = load_embeddings(params, i)
-        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=True) for i in range(self.langnum)])
+        self.embs = nn.ModuleList([nn.Embedding(len(dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum)])
         for i in range(self.langnum):
             self.embs[i].weight.data = _embs[i]
             if i == self.langnum-1 and params.learnable:
