@@ -1,3 +1,6 @@
+"""
+get word translation result for learned universal embeddings
+"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #

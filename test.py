@@ -32,14 +32,15 @@ parser.add_argument("--exp_path", type=str, default="", help="Where to store exp
 parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device cpu or cuda:0,1,2,3")
-parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
-parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langs", type=str, nargs='+', default=['es', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--random_norm", type=float, default=1., help="multiply random embeddings")
-parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
+parser.add_argument("--random_init", type=str, default="uniform", help="type of initialize random vectors")
+parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
 
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -58,13 +59,13 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="sgd", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
-parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
+parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-6, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-parser.add_argument("--truncated", type=float, default=0, help="initialize embeddings as truncated normal distribution")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -90,24 +91,15 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
-params.test = True
-params.langs = params.langs.split('_')
 if params.langs[-1] == 'random':
-    params.lr_shrink = 0.8
-else:
-    params.random_vocab = False
+    params.random_vocab = 75000
 params.langnum = len(params.langs)
-params.embpaths = []
-for i in range(params.langnum):
-    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
+if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mapping, embedding, discriminator = build_model(params)
 trainer = Trainer(mapping, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
-
-# for i in range(params.langnum):
-    # torch.save(torch.norm(embedding.embs[i].weight, dim=1), 'data/emb_norms/{}.pt'.format(params.langs[i]))
 
 # Learning loop for Adversarial Training
 logger.info('----> ADVERSARIAL TRAINING <----\n\n')
@@ -117,12 +109,11 @@ stats_str = [('DIS_COSTS', 'Discriminator loss')]
 # discriminator training
 for _ in range(params.test_epochs):
     trainer.dis_step(stats)
-# mapping training (discriminator fooling)
-    trainer.gen_step(stats, mode='map')
-    trainer.gen_step(stats, mode='emb')
+    trainer.gen_step(mode='map')
+    trainer.gen_step(mode='emb')
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-if params.random_vocab:
-    stats_log.append('Random Norm: %.4f' % (torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))))
+tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+stats_log.append('Target emb Norm: %.4f' % tgt_norm)
 stats_log = ' - '.join(stats_log)
 logger.info(stats_log)

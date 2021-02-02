@@ -36,7 +36,7 @@ class Evaluator:
         self.embedding = trainer.embedding
         self.dicos = trainer.dicos
         self.mapping = trainer.mapping
-        self.discriminators = trainer.discriminators
+        self.discriminator = trainer.discriminator
         self.params = trainer.params
         self.langnum = self.params.langnum
         # self.num_pairs = (self.langnum-1)*(self.langnum-2)x
@@ -63,8 +63,7 @@ class Evaluator:
         )
         if self.params.tgt_lang:
             tgt_analogy_scores = get_wordanalogy_scores(
-                self.tgt_dico.lang, self.tgt_dico.word2id,
-                self.tgt_mapping(self.tgt_emb.weight).detach().cpu().numpy()
+                self.tgt_dico.lang, self.tgt_dico.word2id, self.tgt_mapping(self.tgt_emb.weight).detach().cpu().numpy()
             )
         if src_analogy_scores is not None:
             src_analogy_monolingual_scores = np.mean(list(src_analogy_scores.values()))
@@ -132,13 +131,10 @@ class Evaluator:
 
         # load europarl data
         if not hasattr(self, 'europarl_data'):
-            self.europarl_data = load_europarl_data(
-                lg1, lg2, n_max=(n_keys + 2 * n_idf)
-            )
+            self.europarl_data = load_europarl_data(lg1, lg2, n_max=(n_keys + 2 * n_idf))
 
         # if no Europarl data for this language pair
-        if not self.europarl_data:
-            return
+        if not self.europarl_data: return
 
         # mapped word embeddings
         src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
@@ -236,6 +232,9 @@ class Evaluator:
             if isinstance(to_log[k], list): to_log[k] = sum(to_log[k])/len(to_log[k])
 
     def print_diseval(self, to_log, i, real_preds, fake_preds):
+        """
+        print logs for discriminators evaluate
+        """
         lang = self.params.langs[i]
         real_pred = np.mean(real_preds)
         fake_pred = np.mean(fake_preds)
@@ -258,19 +257,19 @@ class Evaluator:
         """
         bs = 128
         langnum = self.langnum
-        self.discriminators.eval()
+        self.discriminator.eval()
 
         dis_accus = [0]*langnum
         for i in range(langnum-1):
             real_preds, fake_preds = [], []
             for j in range(0, self.embs[i].num_embeddings, bs):
                 emb = self.embs[i].weight[j:j + bs].detach()
-                preds = self.discriminators(emb.detach(), i)
+                preds = self.discriminator(emb.detach(), i)
                 real_preds.extend(preds.detach().cpu().tolist())
 
             for j in range(0, self.embs[-1].num_embeddings, bs):
                 emb = self.mapping(self.embs[-1].weight[j:j + bs].detach(), i, rev=True)
-                preds = self.discriminators(emb.detach(), i)
+                preds = self.discriminator(emb.detach(), i)
                 fake_preds.extend(preds.detach().cpu().tolist())
 
             dis_accus[i] = self.print_diseval(to_log, i, real_preds, fake_preds)
@@ -278,12 +277,12 @@ class Evaluator:
         real_preds, fake_preds = [], []
         for j in range(0, self.embs[-1].num_embeddings, bs):
             emb = self.embs[-1].weight[j:j + bs].detach()
-            preds = self.discriminators(emb, langnum-1)
+            preds = self.discriminator(emb, langnum-1)
             real_preds.extend(preds.detach().cpu().tolist())
         for i in range(langnum-1):
             for j in range(0, self.embs[i].num_embeddings//(langnum-1), bs):
                 emb = self.mapping(self.embs[i].weight[j:j + bs].detach(), i)
-                preds = self.discriminators(emb, langnum-1)
+                preds = self.discriminator(emb, langnum-1)
                 fake_preds.extend(preds.detach().cpu().tolist())
 
         dis_accus[-1] = self.print_diseval(to_log, -1, real_preds, fake_preds)

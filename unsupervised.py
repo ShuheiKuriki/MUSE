@@ -1,17 +1,22 @@
-"""unsupervised MUSE"""
+"""Multilingual Unsupervised Word Embeddings learned by MAT and MPSR"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-# python unsupervised.py --exp_name en_es_random -exp_id lang_mean_lr0_p.7 --langs en_es_random --emb_init lang_mean --device 2 --emb_lr 0
-# python unsupervised.py --exp_name fives/five+en --exp_id fr_p.3 --langs de_es_it_pt_fr_en --device cuda:0
-# python unsupervised.py --exp_name six_langs --exp_id all.3 --langs de_es_it_pt_fr --device cuda:3 --n_epochs 5 --dis_sampling .3 --eval_type no_target --last_eval no_target
-# python unsupervised.py --exp_name six_langs --exp_id en_learnable_lr1_p.5 --langs de_es_it_fr_pt_en --device cuda:1 --emb_lr 1 --n_epochs 15 --dis_sampling 0.5 --eval_type no_target --last_eval no_target --random_start 5
-# python unsupervised.py --exp_name mat_six_langs --exp_id all --langs de_es_it_fr_pt_en --device cuda:2 --eval_type all --last_eval all
-# python unsupervised.py --exp_name sevens/seven_langs --exp_id mat --langs ja_de_es_it_fr_pt_en --device cuda:0 --eval_type no --last_eval all
-# python unsupervised.py --exp_name mat_three_langs --exp_id de_es_en --langs de_es_en --device cuda:0
+# sample excutions(normal)
+# python unsupervised.py --exp_name fives/five+en --exp_id en_mat --langs de es it pt fr en --device cuda:0 --last_eval no_target
+# python unsupervised.py --exp_name sixes --exp_id six_langs_mat --langs de es it fr pt en --device cuda:0
+# python unsupervised.py --exp_name sevens --exp_id seven_langs_mat --langs ja de es it fr pt en --device cuda:0
+# python unsupervised.py --exp_name threes/three_langs_mat --exp_id de_es_en --langs de es en --device cuda:0
+
+# sample excutions(en-variable)
+# python unsupervised.py --exp_name fives/five+en-variable --exp_id mat --langs de es it pt fr en --learnable True --device cuda:0
+# python unsupervised.py --exp_name sixes/six+en-variable --exp_id mat --langs de es it fr pt en en --learnable True --device cuda:0
+# python unsupervised.py --exp_name sevens/seven+en-variable --exp_id mat --langs ja de es it fr pt en en --learnable True --device cuda:0
+# python unsupervised.py --exp_name twos/de_es/en-variable --exp_id mat --langs de es en --learnable True --device cuda:0
+
 import os
 import time
 import json
@@ -25,22 +30,21 @@ from src.models import build_model
 from src.trainer import Trainer
 from src.evaluation import Evaluator
 
-
-
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
-parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
-parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
+parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name(folder name)")
+parser.add_argument("--exp_id", type=str, default="", help="Experiment ID(folder name2)")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
-parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--export", type=str, default='txt', help="Export embeddings after training (txt / pth)")
+parser.add_argument("--save_univ", type=bool, default=False, help="save universal embedding or not")
 parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
-parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', 'it', 'pt', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
@@ -48,9 +52,6 @@ parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabula
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
-# random embedding
-parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
-parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -63,13 +64,13 @@ parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
-parser.add_argument("--random_start", type=int, default=100, help="Number of epochs")
-parser.add_argument("--epoch_size", type=int, default=500000, help="Iterations per epoch")
+parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="sgd", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
-parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
+parser.add_argument("--emb_lr", type=float, default=0.3, help="learning rate for embeddings")
 parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
@@ -85,6 +86,7 @@ parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold c
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
+parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -101,20 +103,17 @@ assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
-params.metric_size = 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
-params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
-params.embpaths = []
-for i in range(params.langnum):
-    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
+if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+if params.learnable: params.last_eval = 'no_target'
 logger = initialize_exp(params)
-mappings, embedding, discriminator = build_model(params)
-trainer = Trainer(mappings, embedding, discriminator, params)
+mapping, embedding, discriminator = build_model(params)
+trainer = Trainer(mapping, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
 
 
@@ -135,14 +134,13 @@ if params.adversarial:
 
             # discriminator training
             if params.dis_sampling < 1:
-                if np.random.rand() <= params.dis_sampling:
-                    trainer.dis_step(stats)
+                if np.random.rand() <= params.dis_sampling: trainer.dis_step(stats)
             else:
-                for i in range(int(params.dis_sampling)):
-                    trainer.dis_step(stats)
+                for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats, mode='map')
+            n_words_proc += trainer.gen_step(mode='map')
+            if params.learnable: trainer.gen_step(mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -156,8 +154,7 @@ if params.adversarial:
                 # reset
                 tic = time.time()
                 n_words_proc = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+                for k, _ in stats_str: del stats[k][:]
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
@@ -171,20 +168,19 @@ if params.adversarial:
 
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
-        # if trainer.map_optimizer.param_groups[0]['lr'] < params.min_lr:
-            # logger.info('Learning rate < 1e-6. BREAK.')
-            # break
 
     logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
-# Learning loop for Procrustes Iterative Refinement
+# Learning loop for MPSR
 if params.n_refinement:
-    # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> ITERATIVE REFINEMENT <----\n\n')
-    trainer.reload_best()
-    to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+    if not params.learnable: trainer.reload_best()
+    # to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
     # evaluator.all_eval(to_log, params.last_eval)
     # evaluator.eval_dis(to_log)
+    # logger.info("__log__:%s", json.dumps(to_log))
+
+    # Get the best mapping according to VALIDATION_METRIC
+    logger.info('----> ITERATIVE REFINEMENT <----\n\n')
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -200,36 +196,43 @@ if params.n_refinement:
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
             # mpsr training step
-            n_words_ref += trainer.refine_step(stats)
+            n_words_ref += trainer.refine_step(stats, mode='map')
+            if params.learnable: trainer.refine_step(stats, mode='emb')
             # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k]) > 0]
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
-                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                logger.info('%06i - %s', n_iter, ' - '.join(stats_log))
                 # reset
                 tic = time.time()
                 n_words_ref = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+                for k, _ in stats_str: del stats[k][:]
 
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
         evaluator.all_eval(to_log, params.eval_type)
-        logger.info("__log__:%s", json.dumps(to_log))
 
         # JSON log / save best model / end of epoch
-        # logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
+if not params.learnable: trainer.reload_best()
 to_log = OrderedDict()
-trainer.reload_best()
 evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
 logger.info("__log__:%s", json.dumps(to_log))
-logger.info('end of the examination')
+
+if params.save_univ:
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
+    logger.info('Writing universal embeddings to %s ...', path)
+    torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
+
 # export embeddings
 # if params.export:
-#     trainer.reload_best()
-#     trainer.export()
+    # trainer.reload_best()
+    # trainer.export()
+
+logger.info('end of the examination')
