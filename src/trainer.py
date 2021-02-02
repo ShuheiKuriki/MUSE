@@ -30,7 +30,7 @@ logger = getLogger()
 class Trainer():
     """train class"""
 
-    def __init__(self, mapping, embedding, discriminators, params):
+    def __init__(self, mapping, embedding, discriminator, params):
         """
         Initialize trainer script.
         """
@@ -39,10 +39,10 @@ class Trainer():
         self.embs = embedding.embs
         self.dicos = params.dicos
         self.mapping = mapping
-        self.discriminators = discriminators
+        self.discriminator = discriminator
         self.params = params
         self.langnum = self.params.langnum
-        self._dicos = [0]*(self.langnum-1)
+        self._dicos = [[0]*self.langnum for _ in range(self.langnum)]
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
@@ -53,10 +53,9 @@ class Trainer():
             self.emb_optimizer = optim_fn(embedding.parameters(), **optim_params)
         if hasattr(params, 'dis_optimizer'):
             optim_fn, optim_params = get_optimizer(params.dis_optimizer)
-            # self.dis_optimizer = optim_fn(itertools.chain(*[d.parameters() for d in discriminators.models]), **optim_params)
-            self.dis_optimizer = optim_fn(discriminators.parameters(), **optim_params)
+            self.dis_optimizer = optim_fn(discriminator.parameters(), **optim_params)
         else:
-            assert discriminators is None
+            assert discriminator is None
         if hasattr(params, 'ref_optimizer'):
             optim_fn, optim_params = get_optimizer(params.ref_optimizer)
             self.ref_optimizer = optim_fn(mapping.parameters(), **optim_params)
@@ -72,11 +71,11 @@ class Trainer():
             logger.info('embedding')
             for param in embedding.parameters():
                 logger.info(param.size())
-            logger.info(embedding.embs[0].weight.requires_grad)
+            logger.info(embedding.embs[-1].weight.requires_grad)
             logger.info('discriminator')
-            for param in discriminators.parameters():
+            for param in discriminator.parameters():
                 logger.info(param.size())
-            logger.info(discriminators.models[0][1].weight.requires_grad)
+            logger.info(discriminator.models[0][1].weight.requires_grad)
 
         # best validation score
         self.prev_metric = -1e12
@@ -93,15 +92,13 @@ class Trainer():
         mf = self.params.dis_most_frequent
         rv = self.params.random_vocab
         langnum = self.langnum
-        assert mf <= min(map(len, self.dicos))
+        assert mf <= min(map(len, self.dicos[:-1]))
 
         # get ids
         if self.params.test:
-            # src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
-            # tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
-            src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
-            tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
-        elif rv and i == langnum-1:
+            src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+            tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
+        elif rv > 0 and (i == langnum-1 or j == langnum-1):
             src_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
             tgt_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
         else:
@@ -151,7 +148,7 @@ class Trainer():
         """
         Train the discriminator.
         """
-        self.discriminators.train()
+        self.discriminator.train()
 
         # loss
         loss = 0
@@ -161,17 +158,13 @@ class Trainer():
             i = random.choice(list(range(self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminators(x.detach(), j)
+            preds = self.discriminator(x.detach(), j)
             loss += F.binary_cross_entropy(preds, y)
 
         if self.params.test:
             logger.info('dis_start')
-            logger.info(self.discriminators.models[0][1].weight[0][:10])
-            logger.info(self.discriminators.models[1][1].weight[0][:10])
-            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
-            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
-            # logger.info(preds[:10])
-            # logger.info(self.mapping.models[0].weight[0][:10])
+            logger.info(self.discriminator.models[0][1].weight[0][:10])
+            logger.info(self.discriminator.models[1][1].weight[0][:10])
 
         # check NaN
         if (loss != loss).detach().any():
@@ -184,43 +177,34 @@ class Trainer():
         self.dis_optimizer.zero_grad()
         loss.backward()
         self.dis_optimizer.step()
-        # torch.nn.utils.clip_grad_norm_(self.discriminators.parameters(), self.params.clip_grad)
+        # torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.params.clip_grad)
 
         if self.params.test:
             logger.info('after_dis')
-            # for i in range(self.langnum):
-                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
-                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
-            # logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.discriminators.models[0][1].weight.grad[0][:10])
-            logger.info(self.discriminators.models[0][1].weight[0][:10])
-            logger.info(self.discriminators.models[1][1].weight[0][:10])
-            # logger.info(torch.norm(self.discriminators.models[0][4].weight[0]))
-            # logger.info(torch.norm(self.discriminators.models[1][4].weight[0]))
-            # print(torch.norm(self.discriminator.layers[1].weight))
-            # logger.info(self.mapping.models[0].weight[0][:10])
-            # logger.info('Discriminator loss %.4f', new_loss)
+            logger.info(self.discriminator.models[0][1].weight[0][:10])
+            logger.info(self.discriminator.models[1][1].weight[0][:10])
 
-    def gen_step(self, stats, mode='map'):
+    def gen_step(self, mode='map'):
         """
         Fooling discriminator training step.
         """
-        self.discriminators.eval()
+        self.discriminator.eval()
 
         # loss
         loss = 0
         if mode == 'map':
             # for each source language
             for i in range(self.langnum):
-                # random select a target language
+                # randomly select a target language
                 j = random.choice(list(range(self.langnum)))
                 x, y = self.get_dis_xy(i, j)
-                preds = self.discriminators(x, j)
+                preds = self.discriminator(x, j)
                 loss += F.binary_cross_entropy(preds, 1-y)
         elif mode == 'emb':
+            # randomly select a source language
             i = random.choice(list(range(self.langnum-1)))
             x, y = self.get_dis_xy(i, self.langnum-1)
-            preds = self.discriminators(x, self.langnum-1)
+            preds = self.discriminator(x, self.langnum-1)
             loss += F.binary_cross_entropy(preds, 1-y)
 
         # check NaN
@@ -244,20 +228,23 @@ class Trainer():
         if self.params.test:
             logger.info('after_%s', mode)
             # print(torch.norm(self.discriminator.layers[1].weight))
-            logger.info(torch.norm(self.discriminators.models[0][1].weight[0]))
-            logger.info(torch.norm(self.discriminators.models[1][1].weight[0]))
+            logger.info(torch.norm(self.discriminator.models[0][1].weight[0]))
+            logger.info(torch.norm(self.discriminator.models[1][1].weight[0]))
 
         return self.langnum * self.params.batch_size
 
     def refine_step(self, stats, mode='map'):
-        # loss
+        """mpsr step"""
         loss = 0
         if mode == 'map':
+            # for each source language
             for i in range(self.langnum):
+                # randomly select a target language
                 j = random.choice(list(range(self.langnum)))
                 x, y = self.get_refine_xy(i, j)
                 loss += F.mse_loss(x, y)
         elif mode == 'emb':
+            # randomly select a target language
             i = random.choice(list(range(self.langnum-1)))
             x, y = self.get_refine_xy(i, self.langnum-1)
             loss += F.mse_loss(x, y)
@@ -284,25 +271,22 @@ class Trainer():
         """
         Load training dictionary.
         """
-        word2id1 = self.src_dico.word2id
-        word2id2 = self.tgt_dico.word2id
+        word2id1 = self.dicos[0].word2id
+        word2id2 = self.dicos[1].word2id
 
         # identical character strings
         if dico_train == "identical_char":
-            self.dico = load_identical_char_dico(word2id1, word2id2)
+            self._dicos[0][1] = load_identical_char_dico(word2id1, word2id2)
         # use one of the provided dictionary
         elif dico_train == "default":
-            filename = '%s-%s.0-5000.txt' % (self.params.src_lang, self.params.tgt_lang)
-            self.dico = load_dictionary(
-                os.path.join(DIC_EVAL_PATH, filename),
-                word2id1, word2id2
-            )
+            filename = f'{self.params.langs[0]}-{self.params.langs[1]}.0-5000.txt'
+            self._dicos[0][1] = load_dictionary(os.path.join(DIC_EVAL_PATH, filename), word2id1, word2id2)
         # dictionary provided by the user
         else:
-            self.dico = load_dictionary(dico_train, word2id1, word2id2)
+            self._dicos[0][1] = load_dictionary(dico_train, word2id1, word2id2)
 
         # cuda
-        self.dico = self.dico.to(self.params.device)
+        self._dicos[0][1] = self._dicos[0][1].to(self.params.device)
 
     def build_dictionary(self):
         """
@@ -328,31 +312,9 @@ class Trainer():
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
         for i in range(self.langnum - 1):
-            A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
-            B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
+            A = self.embs[i].weight.detach()[self._dicos[i][-1][:, 0]]
+            B = self.embs[-1].weight.detach()[self._dicos[i][-1][:, 1]]
             W = self.mapping.models[i].weight.detach()
-            M = B.transpose(0, 1).mm(A).cpu().numpy()
-            U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
-            W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
-
-    def procrustes2(self, i):
-        """
-        Find the best orthogonal matrix generator using the Orthogonal Procrustes problem
-        https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
-        """
-
-        self._dicos = [0]*(self.langnum-1)
-        tgt_emb = self.mapping(self.embs[i].weight, i).detach()
-        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
-        for j in range(self.langnum-1):
-            if i == j: continue
-            src_emb = self.mapping(self.embs[j].weight, j).detach()
-            src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
-            self._dicos[j] = build_dictionary(src_emb, tgt_emb, self.params)
-
-            A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
-            B = self.mapping(self.embs[i].weight, i).detach()[self._dicos[j][:, 1]]
-            W = self.mapping.models[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -368,9 +330,9 @@ class Trainer():
         elif mode == 'ref':
             optimizer = self.ref_optimizer
 
-        if mode == 'map' and 'sgd' not in self.params.map_optimizer: return
-        if mode == 'emb' and 'sgd' not in self.params.emb_optimizer: return
-        if mode == 'ref' and 'sgd' not in self.params.ref_optimizer: return
+        if mode == 'map' and self.params.map_optimizer[:3] != 'sgd': return
+        if mode == 'emb' and self.params.emb_optimizer[:3] != 'sgd': return
+        if mode == 'ref' and self.params.ref_optimizer[:3] != 'sgd': return
 
         old_lr = optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
