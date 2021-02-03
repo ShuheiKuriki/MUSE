@@ -88,24 +88,19 @@ class Trainer():
         mf = self.params.dis_most_frequent
         rv = self.params.random_vocab
         langnum = self.langnum
-        assert mf <= min(map(len, self.dicos))
+        assert mf <= min(map(len, self.dicos[:-1]))
 
         # get ids
         ids = [0]*langnum
         for i in range(langnum):
-            if self.params.test:
-                ids[i] = torch.arange(0, bs, dtype=torch.int64)
-            elif rv and i == langnum-1:
-                ids[i] = torch.LongTensor(bs).random_(rv)
-            else:
-                ids[i] = torch.LongTensor(bs).random_(mf)
-        for i in range(self.langnum):
-            ids[i] = ids[i].to(self.params.device)
+            if self.params.test: ids[i] = torch.arange(0, bs, dtype=torch.int64)
+            elif rv and i == langnum-1: ids[i] = torch.LongTensor(bs).random_(rv)
+            else: ids[i] = torch.LongTensor(bs).random_(mf)
+        for i in range(self.langnum): ids[i] = ids[i].to(self.params.device)
 
         # get word embeddings
         embs = [0]*langnum
-        for i in range(langnum):
-            embs[i] = self.mapping(self.embs[i](ids[i]), i)
+        for i in range(langnum): embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
@@ -118,8 +113,7 @@ class Trainer():
 
         # cross_entropyの場合
         y = torch.zeros((langnum * bs, langnum), dtype=torch.float32)
-        for i in range(langnum):
-            y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
+        for i in range(langnum): y[i*bs:(i+1)*bs, i] = 1-self.params.dis_smooth
 
         y = y.to(self.params.device)
 
@@ -180,13 +174,12 @@ class Trainer():
             # for i in range(self.langnum):
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
                 # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.grad[0])))
-            # logger.info(torch.exp(new_preds[:10]))
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
             # print(torch.norm(self.discriminator.layers[1].weight))
             # logger.info(self.mapping.linear[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
 
-    def gen_step(self, stats, mode='map'):
+    def gen_step(self, mode='map'):
         """
         Fooling discriminator training step.
         """
@@ -194,7 +187,6 @@ class Trainer():
 
         # loss
         x, y = self.get_dis_xy()
-        # logger.info(torch.mean(torch.norm(self.embs[-1].weight.detach(), dim=1)))
         preds = self.discriminator(x)
         if self.params.test:
             logger.info('%s_start', mode)
@@ -214,44 +206,32 @@ class Trainer():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
             self.map_optimizer.step()
+            self.mapping.orthogonalize()
         elif mode == 'emb':
             self.emb_optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
             self.emb_optimizer.step()
 
-
-        # new_x, new_y = self.get_dis_xy()
-        # new_preds = self.discriminator(new_x.detach())
-        # new_loss = torch.mean(torch.sum(-new_y*new_preds, dim=1))
-        # stats['MAP_COSTS'].append(new_loss.detach().item())
         if self.params.test:
             logger.info('after_%s', mode)
-            # print(torch.norm(self.discriminator.layers[1].weight))
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
-            # for i in range(self.langnum):
-                # logger.info('%.15f', torch.mean(torch.norm(self.embs[i].weight.detach()[0])))
-        #     logger.info(torch.exp(new_preds[:10]))
-            # logger.info(self.mapping.linear[0].weight.grad[0][:10])
-            # logger.info(self.mapping.linear[0].weight[0][:10])
-        #     logger.info('Mapping loss %.4f', new_loss)
-        if mode == 'map':
-            self.mapping.orthogonalize()
-            if self.params.test:
-                logger.info('orthogonalized')
-                # x, y = self.get_dis_xy()
-            #     logger.info(torch.exp(self.discriminator(x.detach())[:10]))
-                # logger.info(self.mapping.linear[0].weight[0][:10])
 
         return self.langnum * self.params.batch_size
 
-    def refine_step(self, stats):
-        # loss
+    def refine_step(self, stats, mode='map'):
+        """
+        MPSR step
+        """
         loss = 0
-        langnum = self.params.langnum
-        for i in range(langnum):
-            j = random.choice(list(range(0, langnum)))
-            x, y = self.get_refine_xy(i, j)
+        if mode == 'map':
+            for i in range(self.langnum):
+                j = random.choice(list(range(self.langnum)))
+                x, y = self.get_refine_xy(i, j)
+                loss += F.mse_loss(x, y)
+        elif mode == 'emb':
+            i = random.choice(list(range(self.langnum-1)))
+            x, y = self.get_refine_xy(i, self.langnum-1)
             loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():
@@ -259,34 +239,17 @@ class Trainer():
             sys.exit()
 
         stats['REFINE_COSTS'].append(loss.item())
-        # optim
-        self.ref_optimizer.zero_grad()
-        loss.backward()
-        self.ref_optimizer.step()
+        if mode == 'map':
+            self.ref_optimizer.zero_grad()
+            loss.backward()
+            self.ref_optimizer.step()
+            self.mapping.orthogonalize()
+        elif mode == 'emb':
+            self.emb_ref_optimizer.zero_grad()
+            loss.backward()
+            self.emb_ref_optimizer.step()
 
-        self.mapping.orthogonalize()
-
-        return langnum * self.params.batch_size
-
-    def refine_emb_step(self, stats):
-        # loss
-        loss = 0
-        langnum = self.params.langnum
-        j = random.choice(list(range(0, langnum-1)))
-        x, y = self.get_refine_xy(langnum-1, j)
-        loss += F.mse_loss(x, y)
-        # check NaN
-        if (loss != loss).any():
-            logger.error("NaN detected (fool discriminator)")
-            sys.exit()
-
-        stats['REFINE_COSTS'].append(loss.item())
-        # optim
-        self.emb_ref_optimizer.zero_grad()
-        loss.backward()
-        self.emb_ref_optimizer.step()
-
-        return langnum * self.params.batch_size
+        return self.langnum * self.params.batch_size
 
     def load_training_dico(self, dico_train):
         """
@@ -369,17 +332,14 @@ class Trainer():
         """
         Update learning rate when using SGD.
         """
-        if mode == 'map':
-            optimizer = self.map_optimizer
-        elif mode == 'emb':
-            optimizer = self.emb_optimizer
-        elif mode == 'ref':
-            optimizer = self.ref_optimizer
+        if mode == 'map': optimizer = self.map_optimizer
+        elif mode == 'emb': optimizer = self.emb_optimizer
+        elif mode == 'ref': optimizer = self.ref_optimizer
 
-        if mode == 'map' and 'sgd' not in self.params.map_optimizer: return
-        if mode == 'emb' and 'sgd' not in self.params.emb_optimizer: return
-        if mode == 'ref' and 'sgd' not in self.params.ref_optimizer: return
-        
+        if mode == 'map' and self.params.map_optimizer[:3] != 'sgd': return
+        if mode == 'emb' and self.params.emb_optimizer[:3] != 'sgd': return
+        if mode == 'ref' and self.params.ref_optimizer[:3] != 'sgd': return
+
         old_lr = optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
         if new_lr < old_lr:

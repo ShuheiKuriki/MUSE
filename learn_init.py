@@ -133,7 +133,7 @@ for n_epoch in range(params.n_epochs):
                 trainer.dis_step(stats)
 
         # mapping training (discriminator fooling)
-        n_words_proc += trainer.gen_step(stats, mode='emb')
+        n_words_proc += trainer.gen_step(mode='emb')
 
         # log stats
         if n_iter % 500 == 0:
