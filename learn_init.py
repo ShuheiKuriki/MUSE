@@ -34,7 +34,7 @@ parser.add_argument("--export", type=str, default="txt", help="Export embeddings
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -97,7 +97,7 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.test = False
 params.langs = params.langs.split('_')
 if params.langs[-1] != 'random':
-    params.random_vocab = False
+    params.univ_vocab = False
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -163,16 +163,8 @@ for n_epoch in range(params.n_epochs):
     trainer.update_lr(to_log, VALIDATION_METRIC)
 
 logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
-path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
-logger.info('Writing source embeddings to %s ...', path)
-torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
-
-# to_log = OrderedDict()
-# trainer.reload_best()
-# evaluator.all_eval(to_log, '')
-# evaluator.eval_dis(to_log)
-# logger.info('end of the examination')
 # export embeddings
 # if params.export:
     # trainer.reload_best()
     # trainer.export()
+logger.info('end of the examination')

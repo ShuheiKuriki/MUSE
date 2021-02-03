@@ -96,9 +96,10 @@ class Embedding(nn.Module):
         for i in range(self.langnum-1): self.embs[i].weight.data = _embs[i]
 
         # set tgt embedding and dico
-        if params.random_vocab:
-            params.dicos[-1], _embs[-1] = [0]*params.random_vocab, self.initialize_random(params)
+        if params.langs[-1] == 'random':
+            params.dicos[-1], _embs[-1] = [0]*params.univ_vocab, self.initialize_random(params)
         else:
+            if params.learnable: params.max_vocab = params.univ_vocab
             params.dicos[-1], _embs[-1] = load_embeddings(params, params.langnum-1)
 
         self.embs.append(nn.Embedding(len(params.dicos[-1]), params.emb_dim, sparse=False))
@@ -110,11 +111,11 @@ class Embedding(nn.Module):
         """
         initialize random vectors
         """
-        emb = torch.randn(params.random_vocab, params.emb_dim) / (params.emb_dim**.5)
+        emb = torch.randn(params.univ_vocab, params.emb_dim) / (params.emb_dim**.5)
         if params.emb_init == 'norm_mean':
             mean_norms = [torch.norm(self.embs[l].weight.data, dim=1, keepdim=True).expand_as(self.embs[l].weight.data) for l in range(self.langnum)]
             norm_mean = torch.mean(torch.cat(mean_norms).view(self.langnum, -1, params.emb_dim), dim=0)
-            emb *= norm_mean[:params.random_vocab] / torch.mean(norm_mean[:params.random_vocab]) * params.emb_norm
+            emb *= norm_mean[:params.univ_vocab] / torch.mean(norm_mean[:params.univ_vocab]) * params.emb_norm
         elif params.emb_init == 'load':
             emb = torch.load(params.emb_file).to('cpu')
         elif params.emb_init == 'uniform':

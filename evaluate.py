@@ -30,7 +30,7 @@ parser.add_argument("--device", type=str, default='cuda:0', help="select device"
 # data
 parser.add_argument("--langs", type=str, default='es_en', help="Source language")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
-parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--emb_lr", type=float, default=0, help="rate for learning embeddings")
 
 # reload pre-trained embeddings
