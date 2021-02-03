@@ -7,6 +7,7 @@ Supervised
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
+# python supervised.py --exp_name twos/supervised --exp_id de_es --langs de es --device cuda:0
 
 import os
 import json
@@ -98,7 +99,7 @@ for n_epoch in range(params.n_refinement+1):
     trainer.procrustes()
 
     # embeddings evaluation
-    to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': ""})
+    to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': torch.mean(torch.norm(embedding.embs[-1].weight, dim=1)).item()})
     evaluator.all_eval(to_log, 'all')
 
     # JSON log / save best model / end of epoch
