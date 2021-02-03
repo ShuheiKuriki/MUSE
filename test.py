@@ -91,8 +91,6 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
-if params.langs[-1] == 'random':
-    params.random_vocab = 75000
 params.langnum = len(params.langs)
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)

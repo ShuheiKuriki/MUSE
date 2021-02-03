@@ -117,7 +117,7 @@ class Embedding(nn.Module):
         """
         emb = torch.randn(params.random_vocab, params.emb_dim) / (params.emb_dim**.5)
         if params.emb_init == 'norm_mean':
-            mean_norms = [torch.norm(self.embs[l], dim=1, keepdim=True).expand_as(self.embs[l]) for l in range(self.langnum)]
+            mean_norms = [torch.norm(self.embs[l].weight.data, dim=1, keepdim=True).expand_as(self.embs[l].weight.data) for l in range(self.langnum-1)]
             norm_mean = torch.mean(torch.cat(mean_norms).view(self.langnum, -1, params.emb_dim), dim=0)
             emb *= norm_mean[:params.random_vocab] / torch.mean(norm_mean[:params.random_vocab]) * params.emb_norm
         elif params.emb_init == 'load':
