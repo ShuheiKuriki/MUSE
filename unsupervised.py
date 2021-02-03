@@ -39,8 +39,8 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID(folder name2)")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default='txt', help="Export embeddings after training (txt / pth)")
-parser.add_argument("--save_univ", type=bool, default=False, help="save universal embedding or not")
-parser.add_argument("--eval_type", type=str, default="only_target", help="evaluation type during training")
+parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
+parser.add_argument("--ref_eval", type=str, default="only_target", help="evaluation type during refinement")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
@@ -48,7 +48,7 @@ parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', '
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
-parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="universal vocabulary size (0 to disable)")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
@@ -159,7 +159,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no')
+        evaluator.all_eval(to_log, params.adv_eval)
         evaluator.eval_dis(to_log)
         logger.info("__log__:%s", json.dumps(to_log))
 
@@ -172,16 +172,17 @@ if params.adversarial:
 
     logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
+trainer.reload_best()
+to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+evaluator.all_eval(to_log, params.last_eval)
+evaluator.eval_dis(to_log)
+logger.info("__log__:%s", json.dumps(to_log))
+
 # Learning loop for MPSR
 if params.n_refinement:
-    if not params.learnable: trainer.reload_best()
-    # to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
-    # evaluator.all_eval(to_log, params.last_eval)
-    # evaluator.eval_dis(to_log)
-    # logger.info("__log__:%s", json.dumps(to_log))
 
     # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> ITERATIVE REFINEMENT <----\n\n')
+    logger.info('----> ITERATIVE MPSR <----\n\n')
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -202,7 +203,9 @@ if params.n_refinement:
             # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k]) > 0]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
                 logger.info('%06i - %s', n_iter, ' - '.join(stats_log))
                 # reset
@@ -211,25 +214,21 @@ if params.n_refinement:
                 for k, _ in stats_str: del stats[k][:]
 
         # embeddings evaluation
-        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':''})
-        evaluator.all_eval(to_log, params.eval_type)
+        to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
+        evaluator.all_eval(to_log, params.ref_eval)
 
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-if not params.learnable: trainer.reload_best()
+trainer.reload_best()
 to_log = OrderedDict()
 evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
 logger.info("__log__:%s", json.dumps(to_log))
 
-if params.save_univ:
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
-    path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
-    logger.info('Writing universal embeddings to %s ...', path)
-    torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 # export embeddings
 # if params.export:

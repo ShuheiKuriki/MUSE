@@ -42,7 +42,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 # random embedding
 parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
 parser.add_argument("--emb_norm", type=float, default=0.01, help="norm of embeddings")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
