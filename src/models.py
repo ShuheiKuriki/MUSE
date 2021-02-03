@@ -7,6 +7,7 @@
 #
 
 import torch
+from torch.nn import functional as F
 import numpy as np
 from torch import nn
 from scipy.stats import truncnorm
@@ -62,11 +63,13 @@ class Mapping(nn.Module):
                 # self.linear[i].weight.data = torch.diag(torch.ones(self.emb_dim))
                 self.linear[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
-    def forward(self, x, i):
+    def forward(self, x, i, j=None):
         """
         map into target space
         """
-        return self.linear[i](x) if i % self.langnum < self.langnum-1 else x
+        if i % self.langnum < self.langnum-1: x = self.linear[i](x)
+        if j is None or j % self.langnum == self.langnum-1: return x
+        return F.linear(x, self.linear[j].weight.t())
 
     def orthogonalize(self):
         """
@@ -113,7 +116,7 @@ class Embedding(nn.Module):
         """
         emb = torch.randn(params.univ_vocab, params.emb_dim) / (params.emb_dim**.5)
         if params.emb_init == 'norm_mean':
-            mean_norms = [torch.norm(self.embs[l].weight.data, dim=1, keepdim=True).expand_as(self.embs[l].weight.data) for l in range(self.langnum)]
+            mean_norms = [torch.norm(self.embs[l].weight.data, dim=1, keepdim=True).expand_as(self.embs[l].weight.data) for l in range(self.langnum-1)]
             norm_mean = torch.mean(torch.cat(mean_norms).view(self.langnum, -1, params.emb_dim), dim=0)
             emb *= norm_mean[:params.univ_vocab] / torch.mean(norm_mean[:params.univ_vocab]) * params.emb_norm
         elif params.emb_init == 'load':

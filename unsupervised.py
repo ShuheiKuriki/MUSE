@@ -41,8 +41,8 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID(folder
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
-parser.add_argument("--ref_eval", type=str, default="only_target", help="evaluation type during refinement")
-parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
+parser.add_argument("--ref_eval", type=str, default="no", help="evaluation type during refinement")
+parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', 'it', 'pt', 'en'], help="languages")
@@ -112,9 +112,7 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.langnum = len(params.langs)
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
-if params.learnable:
-    params.ref_eval = 'no'
-    params.last_eval = 'no_target'
+if params.learnable: params.last_eval = 'no_target'
 logger = initialize_exp(params)
 mapping, embedding, discriminator = build_model(params)
 trainer = Trainer(mapping, embedding, discriminator, params)
@@ -145,7 +143,7 @@ if params.adversarial:
 
             # mapping training (discriminator fooling)
             n_words_proc += trainer.gen_step(mode='map')
-            if params.learnable: trainer.gen_step(mode='emb')
+            if params.learnable: n_words_proc += trainer.gen_step(mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -203,7 +201,8 @@ if params.n_refinement:
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
             # mpsr training step
-            n_words_ref += trainer.refine_step(stats)
+            n_words_ref += trainer.refine_step(stats, mode='map')
+            if params.learnable: n_words_ref += trainer.refine_step(stats, mode='emb')
             # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]

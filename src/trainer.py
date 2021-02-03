@@ -132,9 +132,7 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        x = self.mapping(self.embs[i](src_ids), i)
-        if j < self.langnum-1:
-            x = F.linear(x, self.mapping.linear[j].weight.t())
+        x = self.mapping(self.embs[i](src_ids), i, j)
         y = self.embs[j](tgt_ids)
 
         return x, y

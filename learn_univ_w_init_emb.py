@@ -223,7 +223,7 @@ if params.n_refinement:
                 for k, _ in stats_str: del stats[k][:]
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
-        evaluator.all_eval(to_log, params.eval_type)
+        evaluator.all_eval(to_log, params.ref_eval)
         evaluator.eval_dis(to_log)
 
         # JSON log / save best model / end of epoch
