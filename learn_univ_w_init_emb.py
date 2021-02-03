@@ -38,7 +38,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
-parser.add_argument("--ref_eval", type=str, default="only_target", help="evaluation type during refinement")
+parser.add_argument("--ref_eval", type=str, default="no", help="evaluation type during refinement")
 parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
