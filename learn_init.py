@@ -7,7 +7,8 @@ learn initial universal embedding
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init norm_mean --emb_norm 4.5 --emb_optimizer adagrad --device cuda:0 
+# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init uniform --emb_norm 0.01 --emb_optimizer adam --device cuda:0
+# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init norm_mean --emb_norm 4.5 --emb_optimizer adam --device cuda:0
 import os
 import time
 import json

@@ -7,9 +7,9 @@
 #
 
 import torch
+from torch import nn
 from torch.nn import functional as F
 import numpy as np
-from torch import nn
 from scipy.stats import truncnorm
 from .utils import load_embeddings, normalize_embeddings
 
@@ -68,7 +68,7 @@ class Mapping(nn.Module):
         map into target space
         """
         if i % self.langnum < self.langnum-1: x = self.linear[i](x)
-        if j is None or j % self.langnum == self.langnum-1: return x
+        if j is None or (j % self.langnum == self.langnum-1): return x
         return F.linear(x, self.linear[j].weight.t())
 
     def orthogonalize(self):

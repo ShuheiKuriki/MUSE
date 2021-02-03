@@ -229,7 +229,7 @@ class Trainer():
                 loss += F.mse_loss(x, y)
         elif mode == 'emb':
             i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(i, self.langnum-1)
+            x, y = self.get_refine_xy(self.langnum-1, i)
             loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():

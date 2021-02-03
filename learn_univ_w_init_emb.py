@@ -38,7 +38,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
-parser.add_argument("--ref_eval", type=str, default="no", help="evaluation type during refinement")
+parser.add_argument("--ref_eval", type=str, default="no_target", help="evaluation type during refinement")
 parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
@@ -54,7 +54,6 @@ parser.add_argument("--emb_init", type=str, default='load', help="initialize typ
 parser.add_argument("--emb_file", type=str, default='', help="where to load initial embedding")
 parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
 parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
-parser.add_argument("--save_random", type=bool, default=False, help="save random embedding or not)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
