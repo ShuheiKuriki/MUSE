@@ -30,8 +30,9 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
-parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langs", type=str, nargs='+', default=['es', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
@@ -53,7 +54,7 @@ parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator s
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
-parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
+parser.add_argument("--n_epochs", type=int, default=10, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
@@ -94,16 +95,9 @@ params.metric_size = 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
-params.test = False
-params.langs = params.langs.split('_')
-if params.langs[-1] != 'random':
-    params.univ_vocab = False
 params.langnum = len(params.langs)
-params.embpaths = []
-for i in range(params.langnum):
-    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-if params.emb_optimizer == 'sgd':
-    params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
+if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)
@@ -111,7 +105,8 @@ evaluator = Evaluator(trainer)
 
 
 # Learning loop for Adversarial Training
-logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+logger.info('\n\n')
+logger.info('----> ADVERSARIAL TRAINING <----\n')
 
     # training loop
 for n_epoch in range(params.n_epochs):
@@ -126,11 +121,9 @@ for n_epoch in range(params.n_epochs):
 
         # discriminator training
         if params.dis_sampling < 1:
-            if np.random.rand() <= params.dis_sampling:
-                trainer.dis_step(stats)
+            if np.random.rand() <= params.dis_sampling: trainer.dis_step(stats)
         else:
-            for i in range(int(params.dis_sampling)):
-                trainer.dis_step(stats)
+            for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
         # mapping training (discriminator fooling)
         n_words_proc += trainer.gen_step(mode='emb')

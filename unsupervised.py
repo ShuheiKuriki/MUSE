@@ -123,7 +123,8 @@ evaluator = Evaluator(trainer)
 
 # Learning loop for Adversarial Training
 if params.adversarial:
-    logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+    logger.info('\n\n')
+    logger.info('----> ADVERSARIAL TRAINING <----\n')
 
     # training loop
     for n_epoch in range(params.n_epochs):
@@ -173,18 +174,20 @@ if params.adversarial:
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 trainer.reload_best()
+
+logger.info('----> Adversarial Results <----\n')
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
-logger.info("__log__:%s", json.dumps(to_log))
+logger.info("__log__:%s\n\n", json.dumps(to_log))
 
 # Learning loop for MPSR
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> Iterative MPSR <----\n\n')
+    logger.info('----> Iterative MPSR <----\n')
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -223,12 +226,12 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 trainer.reload_best()
 to_log = OrderedDict()
 evaluator.all_eval(to_log, params.last_eval)
-logger.info("__log__:%s", json.dumps(to_log))
+logger.info("__log__:%s\n", json.dumps(to_log))
 
 # export embeddings
 # if params.export:
