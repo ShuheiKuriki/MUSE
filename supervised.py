@@ -84,9 +84,7 @@ VALIDATION_METRIC_UNSUP = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 VALIDATION_METRIC = VALIDATION_METRIC_UNSUP if params.dico_train == 'identical_char' else VALIDATION_METRIC_SUP
 logger.info("Validation metric: %s", VALIDATION_METRIC)
 
-"""
-Learning loop for Procrustes Iterative Learning
-"""
+# Learning loop for Procrustes Iterative Learning
 for n_epoch in range(params.n_refinement + 1):
 
     logger.info('Starting epoch %i...', n_epoch)
