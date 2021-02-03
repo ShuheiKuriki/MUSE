@@ -41,7 +41,7 @@ class Trainer():
         self.discriminator = discriminator
         self.params = params
         self.langnum = self.params.langnum
-        self._dicos = [0]*(self.langnum-1)
+        self._dicos = [[0]*self.langnum for _ in range(self.langnum)]
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
@@ -255,25 +255,22 @@ class Trainer():
         """
         Load training dictionary.
         """
-        word2id1 = self.src_dico.word2id
-        word2id2 = self.tgt_dico.word2id
+        word2id1 = self.dicos[0].word2id
+        word2id2 = self.dicos[1].word2id
 
         # identical character strings
         if dico_train == "identical_char":
-            self.dico = load_identical_char_dico(word2id1, word2id2)
+            self._dicos[0][1] = load_identical_char_dico(word2id1, word2id2)
         # use one of the provided dictionary
         elif dico_train == "default":
-            filename = '%s-%s.0-5000.txt' % (self.params.src_lang, self.params.tgt_lang)
-            self.dico = load_dictionary(
-                os.path.join(DIC_EVAL_PATH, filename),
-                word2id1, word2id2
-            )
+            filename = f'{self.params.langs[0]}-{self.params.langs[1]}.0-5000.txt'
+            self._dicos[0][1] = load_dictionary(os.path.join(DIC_EVAL_PATH, filename), word2id1, word2id2)
         # dictionary provided by the user
         else:
-            self.dico = load_dictionary(dico_train, word2id1, word2id2)
+            self._dicos[0][1] = load_dictionary(dico_train, word2id1, word2id2)
 
         # cuda
-        self.dico = self.dico.to(self.params.device)
+        self._dicos[0][1] = self._dicos[0][1].to(self.params.device)
 
     def build_dictionary(self):
         """
@@ -299,31 +296,9 @@ class Trainer():
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
         for i in range(self.langnum - 1):
-            A = self.embs[i].weight.detach()[self._dicos[i][:, 0]]
-            B = self.embs[-1].weight.detach()[self._dicos[i][:, 1]]
+            A = self.embs[i].weight.detach()[self._dicos[i][-1][:, 0]]
+            B = self.embs[-1].weight.detach()[self._dicos[i][-1][:, 1]]
             W = self.mapping.linear[i].weight.detach()
-            M = B.transpose(0, 1).mm(A).cpu().numpy()
-            U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
-            W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
-
-    def procrustes2(self, i):
-        """
-        Find the best orthogonal matrix generator using the Orthogonal Procrustes problem
-        https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
-        """
-
-        self._dicos = [0]*(self.langnum-1)
-        tgt_emb = self.mapping(self.embs[i].weight, i).detach()
-        tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
-        for j in range(self.langnum-1):
-            if i == j: continue
-            src_emb = self.mapping(self.embs[j].weight, j).detach()
-            src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
-            self._dicos[j] = build_dictionary(src_emb, tgt_emb, self.params)
-
-            A = self.embs[j].weight.detach()[self._dicos[j][:, 0]]
-            B = self.mapping(self.embs[i].weight, i).detach()[self._dicos[j][:, 1]]
-            W = self.mapping.linear[j].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
