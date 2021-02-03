@@ -63,13 +63,13 @@ class Mapping(nn.Module):
             for i in range(self.langnum-1):
                 self.models[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
-    def forward(self, x, i, rev=False):
+    def forward(self, x, i, j=None):
         """
         map into target space
         """
-        if i % self.langnum == self.langnum-1: return x
-        if not rev: return self.models[i](x)
-        return F.linear(x, self.models[i].weight.t())
+        if i % self.langnum < self.langnum-1: x = self.linear[i](x)
+        if j is None or j % self.langnum == self.langnum-1: return x
+        return F.linear(x, self.linear[j].weight.t())
 
     def orthogonalize(self):
         """
@@ -98,16 +98,16 @@ class Embedding(nn.Module):
 
         self.embs = nn.ModuleList([nn.Embedding(len(params.dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum-1)])
 
-        for i in range(self.langnum-1): self.embs[i].weight.data = _embs[i]
+        for i in range(self.langnum-1):
+            self.embs[i].weight.data = _embs[i]
+            self.embs[i].requires_grad = False
 
         # set tgt embedding and dico
         if params.langs[-1] == 'random':
             params.dicos[-1], _embs[-1] = [0]*params.univ_vocab, self.initialize_random(params)
         else:
+            if params.learnable: params.max_vocab = params.univ_vocab
             params.dicos[-1], _embs[-1] = load_embeddings(params, params.langnum-1)
-            if params.learnable:
-                params.dicos[-1] = params.dicos[-1][:params.univ_vocab]
-                _embs[-1] = _embs[-1][:params.univ_vocab]
 
         self.embs.append(nn.Embedding(len(params.dicos[-1]), params.emb_dim, sparse=False))
         self.embs[-1].weight.data = _embs[-1]

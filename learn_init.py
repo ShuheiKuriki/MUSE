@@ -106,9 +106,10 @@ evaluator = Evaluator(trainer)
 
 
 # Learning loop for Adversarial Training
-logger.info('----> ADVERSARIAL TRAINING <----\n\n')
+logger.info('\n\n')
+logger.info('----> ADVERSARIAL TRAINING <----\n')
 
-    # training loop
+# training loop
 for n_epoch in range(params.n_epochs):
 
     logger.info('Starting adversarial training epoch %i...', n_epoch)
@@ -154,7 +155,7 @@ for n_epoch in range(params.n_epochs):
     # update the learning rate (stop if too small)
     trainer.update_lr(to_log, VALIDATION_METRIC)
 
-logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 to_log = OrderedDict()
 trainer.reload_best()

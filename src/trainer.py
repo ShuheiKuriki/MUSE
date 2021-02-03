@@ -139,7 +139,7 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        x = self.mapping(self.mapping(self.embs[i](src_ids), i), j, rev=True)
+        x = self.mapping(self.embs[i](src_ids), i, j)
         y = self.embs[j](tgt_ids)
 
         return x, y
