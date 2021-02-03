@@ -36,7 +36,8 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--eval_type", type=str, default="no_target", help="evaluation type during training")
+parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
+parser.add_argument("--ref_eval", type=str, default="only_target", help="evaluation type during refinement")
 parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
@@ -51,7 +52,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 parser.add_argument("--emb_init", type=str, default='load', help="initialize type of embeddings")
 parser.add_argument("--emb_file", type=str, default='', help="where to load initial embedding")
 parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
-parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -82,7 +83,7 @@ parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb o
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
-parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -158,7 +159,7 @@ if params.adversarial:
 
         # embeddings / discriminator evaluation
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no')
+        evaluator.all_eval(to_log, params.adv_eval)
         evaluator.eval_dis(to_log)
         logger.info("__log__:%s", json.dumps(to_log))
 
@@ -171,12 +172,16 @@ if params.adversarial:
 
     logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
+trainer.reload_best()
+to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+evaluator.all_eval(to_log, params.last_eval)
+evaluator.eval_dis(to_log)
+logger.info("__log__:%s", json.dumps(to_log))
 
 # Learning loop for MPSR
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
     logger.info('----> ITERATIVE MPSR <----\n\n')
-    # trainer.reload_best()
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -215,9 +220,9 @@ if params.n_refinement:
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-# to_log = OrderedDict()
-# trainer.reload_best()
-# evaluator.all_eval(to_log, params.last_eval)
-# logger.info("__log__:%s", json.dumps(to_log))
+to_log = OrderedDict()
+trainer.reload_best()
+evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
+logger.info("__log__:%s", json.dumps(to_log))
 logger.info('end of the examination')

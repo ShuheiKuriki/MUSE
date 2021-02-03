@@ -90,7 +90,7 @@ class Trainer():
         # select random word IDs
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
-        rv = self.params.random_vocab
+        rv = self.params.univ_vocab
         langnum = self.langnum
         assert mf <= min(map(len, self.dicos[:-1]))
 
@@ -371,6 +371,11 @@ class Trainer():
                 logger.info('* Saving the generator to %s ...', path)
                 torch.save(W, path)
 
+            if self.params.learnable:
+                path = os.path.join(self.params.exp_path, 'vectors-%s.pth' % self.params.langs[-1])
+                logger.info('Writing universal embeddings to %s ...', path)
+                torch.save(self.embs[-1].weight.data.to('cpu'), path)
+
     def reload_best(self):
         """
         Reload the best generator.
@@ -383,7 +388,14 @@ class Trainer():
             to_reload = torch.from_numpy(torch.load(path))
             W = self.mapping.models[i].weight.detach()
             assert to_reload.size() == W.size()
-            W.copy_(to_reload.type_as(W))
+            W.data = to_reload.type_as(W)
+
+        if self.params.learnable:
+            path = os.path.join(self.params.exp_path, 'vectors-%s.pth' % self.params.langs[-1])
+            logger.info('* Reloading the best universal embedding from %s ...', path)
+            # reload the model
+            assert os.path.isfile(path)
+            self.embs[-1].weight.data = torch.load(path).to(self.params.device)
 
     def reload(self, folder):
         """
