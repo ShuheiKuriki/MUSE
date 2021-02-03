@@ -53,29 +53,19 @@ class Evaluator:
             # to_log['ws_monolingual_scores'] = ws_monolingual_scores
             # to_log.update({'src_' + k: ws_scores[k] for k in ws_scores})
 
-    def monolingual_wordanalogy(self, to_log):
+    def monolingual_wordanalogy(self, i, to_log):
         """
         Evaluation on monolingual word analogy.
         """
-        src_analogy_scores = get_wordanalogy_scores(
-            self.src_dico.lang, self.src_dico.word2id,
-            self.src_mapping(self.src_emb.weight).detach().cpu().numpy()
+        analogy_scores = get_wordanalogy_scores(
+            self.dicos[i].lang, self.dicos[i].word2id,
+            self.mapping(self.embs[i].weight, i).detach().cpu().numpy()
         )
-        if self.params.tgt_lang:
-            tgt_analogy_scores = get_wordanalogy_scores(
-                self.tgt_dico.lang, self.tgt_dico.word2id,
-                self.tgt_mapping(self.tgt_emb.weight).detach().cpu().numpy()
-            )
-        if src_analogy_scores is not None:
-            src_analogy_monolingual_scores = np.mean(list(src_analogy_scores.values()))
-            logger.info("Monolingual source word analogy score average: %.5f", src_analogy_monolingual_scores)
-            to_log['src_analogy_monolingual_scores'] = src_analogy_monolingual_scores
-            to_log.update({'src_' + k: v for k, v in src_analogy_scores.items()})
-        if self.params.tgt_lang and tgt_analogy_scores is not None:
-            tgt_analogy_monolingual_scores = np.mean(list(tgt_analogy_scores.values()))
-            logger.info("Monolingual target word analogy score average: %.5f", tgt_analogy_monolingual_scores)
-            to_log['tgt_analogy_monolingual_scores'] = tgt_analogy_monolingual_scores
-            to_log.update({'tgt_' + k: v for k, v in tgt_analogy_scores.items()})
+        if analogy_scores is not None:
+            analogy_monolingual_scores = np.mean(list(analogy_scores.values()))
+            logger.info("Monolingual word analogy score average: %.5f", analogy_monolingual_scores)
+            to_log['analogy_monolingual_scores'] = analogy_monolingual_scores
+            to_log.update(analogy_scores)
 
     def crosslingual_wordsim(self, i, j, to_log):
         """
@@ -137,8 +127,7 @@ class Evaluator:
             )
 
         # if no Europarl data for this language pair
-        if not self.europarl_data:
-            return
+        if not self.europarl_data: return
 
         # mapped word embeddings
         src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()

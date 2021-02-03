@@ -1,13 +1,18 @@
-"""unsupervised MUSE"""
+"""
+learn unversal embedding with the initial embedding given
+before run this code, initial random embedding should be prepared at --emb_file or --exp_name
+"""
 # Copyright (c) 2017-present, Facebook, Inc.
 # All rights reserved.
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_map_and_en.py --langs de_pt_fr_it_es_en --exp_name en_learnable/six_langs --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:2
-# python learn_map_and_en.py --langs de_pt_fr_it_es_en_en --exp_name en_learnable/six+en --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:1
-# python learn_map_and_en.py --langs ja_de_pt_fr_it_es_en --exp_name en_learnable/seven_langs --exp_id new_lr0_adam_p.5 --emb_lr 0 --random_start 10 --dis_sampling .5 --device cuda:3
+# sample excutions
+# python learn_univ_w_init_emb.py --langs de es fr it pt random --exp_name fives/five+en-like --exp_id mat_lr.3 --emb_lr .3 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de en es fr it pt random --exp_name sixes/six+en-like --exp_id mat_lr.5 --emb_lr .5 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de en es fr it ja pt random --exp_name sevens/seven+en-like --exp_id mat_lr.5 --emb_lr .5 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de es random --exp_name twos/de_es/en-like --exp_id mat_lr.5  --emb_lr .5 --device cuda:0
 
 import os
 import time
@@ -28,38 +33,48 @@ parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
 parser.add_argument("--verbose", type=int, default=2, help="Verbose level (2:debug, 1:info, 0:warning)")
 parser.add_argument("--exp_path", type=str, default="", help="Where to store experiment logs and models")
 parser.add_argument("--exp_name", type=str, default="debug", help="Experiment name")
+parser.add_argument("--map_path", type=str, default="dumped/three_langs/", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--eval_type", type=str, default="no_target", help="evaluation type during training")
+parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
+parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
-parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', 'it', 'pt', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--random_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
-parser.add_argument("--learnable", type=bool, default=True, help="learn last emb")
+parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
+# random embedding
+parser.add_argument("--emb_init", type=str, default='load', help="initialize type of embeddings")
+parser.add_argument("--emb_file", type=str, default='', help="where to load initial embedding")
+parser.add_argument("--emb_norm", type=float, default=0, help="norm of embeddings")
+parser.add_argument("--random_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--save_random", type=bool, default=False, help="save random embedding or not)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=.3, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=.7, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
 parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
-parser.add_argument("--random_start", type=int, default=0, help="epoch which start random lerning")
+parser.add_argument("--random_start", type=int, default=0, help="epoch when embedding lerning starts")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
+parser.add_argument("--emb_optimizer", type=str, default="sgd", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
-parser.add_argument("--emb_lr", type=float, default=1, help="rate for learning embeddings")
+parser.add_argument("--emb_lr", type=float, default=0.3, help="rate for learning embeddings")
 parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
-parser.add_argument("--lr_decay", type=float, default=0.98, help="Learning rate decay (SGD only)")
+parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
@@ -71,7 +86,7 @@ parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="refin
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
-parser.add_argument("--dico_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -96,13 +111,11 @@ params.metric_size = 10000
 VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
-params.test = False
-params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
+params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.pth'
 params.embpaths = []
-for i in range(params.langnum):
-    params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
-params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
+for i in range(params.langnum): params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)
@@ -131,9 +144,8 @@ if params.adversarial:
                 for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(stats, mode='map')
-            if n_epoch >= params.random_start:
-                trainer.gen_step(stats, mode='emb')
+            n_words_proc += trainer.gen_step(mode='map')
+            if n_epoch >= params.random_start: trainer.gen_step(mode='emb')
 
             # log stats
             if n_iter % 500 == 0:
@@ -153,11 +165,12 @@ if params.adversarial:
         to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
         evaluator.all_eval(to_log, 'no')
         evaluator.eval_dis(to_log)
+        logger.info("__log__:%s", json.dumps(to_log))
 
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
         # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='map')
 
         logger.info('End of epoch %i.\n\n', n_epoch)
 
@@ -171,7 +184,7 @@ if params.adversarial:
 # Learning loop for Procrustes Iterative Refinement
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> ITERATIVE PROCRUSTES REFINEMENT <----\n\n')
+    logger.info('----> ITERATIVE MPSR <----\n\n')
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -186,28 +199,26 @@ if params.n_refinement:
         n_words_ref = 0
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
-            n_words_ref += trainer.refine_step(stats)
-            if n_epoch >= params.ref_emb_start:
-                n_words_ref += trainer.refine_emb_step(stats)
+            n_words_ref += trainer.refine_step(stats, mode='map')
+            if n_epoch >= params.ref_emb_start: n_words_ref += trainer.refine_step(stats, mode='emb')
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
-                stats_log = ['%s: %.4f' % (v, np.mean(stats[k]))
-                             for k, v in stats_str if len(stats[k])]
+                stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
                 tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
                 stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
-                logger.info(('%06i - ' % n_iter) + ' - '.join(stats_log))
+                logger.info('%06i - %s', n_iter, ' - '.join(stats_log))
                 # reset
                 tic = time.time()
                 n_words_ref = 0
-                for k, _ in stats_str:
-                    del stats[k][:]
+                for k, _ in stats_str: del stats[k][:]
         # embeddings evaluation
         to_log = OrderedDict({'n_epoch': 'refine:'+str(n_epoch), 'tgt_norm':tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no_target')
+        evaluator.all_eval(to_log, params.eval_type)
+        evaluator.eval_dis(to_log)
 
         # JSON log / save best model / end of epoch
-        # logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
@@ -215,6 +226,19 @@ if params.n_refinement:
 
 # to_log = OrderedDict()
 # trainer.reload_best()
-# evaluator.all_eval(to_log, 'no_target')
+# evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
+
+if params.save_random:
+    logger.info('The best metric is %.4f, %s epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    path = os.path.join(params.exp_path, 'vectors-%s.pth' % params.langs[-1])
+    logger.info('Writing universal embeddings to %s ...', path)
+    torch.save(embedding.embs[-1].weight.data.to('cpu'), path)
+
+    for i in range(params.langnum-1):
+        W = mappings.linear[i].weight.detach().cpu().numpy()
+        path = os.path.join(params.exp_path, 'best_mapping{}.pth'.format(i+1))
+        logger.info('* Saving the generator to %s ...', path)
+        torch.save(W, path)
+
 logger.info('end of the examination')
