@@ -154,7 +154,7 @@ for n_epoch in range(params.n_epochs):
     logger.info('End of epoch %i.\n\n', n_epoch)
 
     # update the learning rate (stop if too small)
-    trainer.update_lr(to_log, VALIDATION_METRIC)
+    trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
 logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 # export embeddings
