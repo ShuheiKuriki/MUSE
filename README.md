@@ -1,3 +1,18 @@
+## 2/3現在のseparate_map_embブランチの状況
+このブランチは今まで通りのn値分類による敵対的学習とmpsr(refinement)を組み合わせて学習をします。
+現在以下の実行ファイルは正常に動くことを確認しています
+
+supervised.py : 辞書を利用する教師あり学習を行う．1学習5分で終わる
+unsupervised.py : 普遍空間を用いない通常の多言語学習と，英語をそのまま初期値とした普遍空間の学習を行うことができる
+learn_univ_w_init_emb.py : 普遍空間の初期値を別ファイルから取り込み，普遍空間の学習を行う．初期値を事前に学習しておかないといけない
+learn_init.py : 指定した言語と混ぜるようにして普遍空間の初期値を学習します。現在動きますが上手く学習されないのでデバッグ中
+
+普遍空間を学習する方法
+* 英語を初期値とする場合 : unsupervised.pyに適切な条件をつけて実行します(サンプル実行はファイルの冒頭)
+* その他の初期値 : learn_init.py　→　learn_univ_w_init_emb.pyの順に実行します。
+
+各ファイル内の最初にサンプル実行例を複数のせています。
+
 ## MUSE: Multilingual Unsupervised and Supervised Embeddings
 ![Model](./outline_all.png)
 
