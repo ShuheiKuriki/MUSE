@@ -232,8 +232,12 @@ if params.n_refinement:
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+
 to_log = OrderedDict()
 trainer.reload_best()
+logger.info('\n')
+logger.info('----> FINAL RESULT <----\n')
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
 logger.info("__log__:%s\n", json.dumps(to_log))

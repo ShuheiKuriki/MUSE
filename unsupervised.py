@@ -176,7 +176,7 @@ if params.adversarial:
 
 trainer.reload_best()
 
-logger.info('----> Adversarial Results <----\n')
+logger.info('----> ADVERSARIAL RESULTS <----\n')
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
@@ -185,7 +185,7 @@ logger.info("__log__:%s\n\n", json.dumps(to_log))
 # Learning loop for MPSR
 if params.n_refinement:
     # Get the best mapping according to VALIDATION_METRIC
-    logger.info('----> Iterative MPSR <----\n')
+    logger.info('----> ITERATIVE MPSR <----\n')
 
     # training loop
     for n_epoch in range(params.n_refinement):
@@ -228,6 +228,8 @@ if params.n_refinement:
     logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 trainer.reload_best()
+logger.info('\n')
+logger.info('----> FINAL RESULTS <----\n')
 to_log = OrderedDict()
 evaluator.all_eval(to_log, params.last_eval)
 logger.info("__log__:%s\n", json.dumps(to_log))
