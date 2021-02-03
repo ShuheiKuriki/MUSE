@@ -1,10 +1,13 @@
-## 2/3現在のmat_mpsrブランチの状況
+## 2/4現在のmat_mpsrブランチの状況
 現在以下の実行ファイルは正常に動くことを確認しています
 * supervised.py : 辞書を利用する教師あり学習を行う．1学習5分で終わる
 * unsupervised.py : 普遍空間を用いない通常の多言語学習と，英語をそのまま初期値とした普遍空間の学習を行うことができる
 * learn_univ_w_init_emb.py : 普遍空間の初期値を別ファイルから取り込み，普遍空間の学習を行う．初期値を事前に学習しておかないといけない
+* learn_init.py : 普遍空間の初期値を学習する。optimizerの選択が重要
 
-初期値を学習するコードはMAT(Multilingual Adversarial Training)の導入に対応できていなさそうなのでまだ公開していません
+普遍空間を学習する方法
+* en-variable : unsupervised.pyを実行(オプションの設定はファイルの冒頭を参照)
+* en-like : learn_init.py → learn_univ_w_init_emb.py
 
 ## MUSE: Multilingual Unsupervised and Supervised Embeddings
 ![Model](./outline_all.png)
