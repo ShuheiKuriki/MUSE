@@ -113,9 +113,9 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
 params.langnum = len(params.langs)
-params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.pth'
-params.embpaths = []
-for i in range(params.langnum): params.embpaths.append('data/wiki.{}.vec'.format(params.langs[i]))
+if not params.emb_file: params.emb_file = 'dumped/' + params.exp_name + '/random_vector'
+params.emb_file += '/vectors-random.pth'
+params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
 mappings, embedding, discriminator = build_model(params)
@@ -184,7 +184,7 @@ if params.adversarial:
 
 trainer.reload_best()
 
-logger.info('\n----> Adversarial Results <----\n')
+logger.info('----> Adversarial Results <----\n')
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)

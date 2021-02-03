@@ -19,8 +19,6 @@ from src.models import build_model
 from src.trainer import Trainer
 from src.evaluation import Evaluator
 
-
-
 # main
 parser = argparse.ArgumentParser(description='Unsupervised training')
 parser.add_argument("--seed", type=int, default=-1, help="Initialization seed")
@@ -155,7 +153,7 @@ for n_epoch in range(params.n_epochs):
     # update the learning rate (stop if too small)
     trainer.update_lr(to_log, VALIDATION_METRIC)
 
-logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 # export embeddings
 # if params.export:
     # trainer.reload_best()
