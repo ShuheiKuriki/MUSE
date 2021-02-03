@@ -66,16 +66,16 @@ class Trainer():
         if params.test:
             logger.info('mapping')
             for param in mapping.parameters():
-                logger.info(param.size())
-            logger.info(mapping.models[0].weight.requires_grad)
+                logger.info(param.requires_grad)
+            # logger.info(mapping.linear[0].weight.requires_grad)
             logger.info('embedding')
             for param in embedding.parameters():
-                logger.info(param.size())
-            logger.info(embedding.embs[-1].weight.requires_grad)
+                logger.info(param.requires_grad)
+            # logger.info(embedding.embs[-1].weight.requires_grad)
             logger.info('discriminator')
             for param in discriminator.parameters():
-                logger.info(param.size())
-            logger.info(discriminator.models[0][1].weight.requires_grad)
+                logger.info(param.requires_grad)
+            # logger.info(discriminator.models[0][1].weight.requires_grad)
 
         # best validation score
         self.prev_metric = -1e12
@@ -106,11 +106,11 @@ class Trainer():
             tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
-        src_emb = self.mapping(self.mapping(self.embs[i](src_ids), i), j, rev=True)
+        src_emb = self.mapping(self.embs[i](src_ids), i, j)
         tgt_emb = self.embs[j](tgt_ids)
 
         # if self.params.test:
-            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.models[1].weight)))
+            # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
             # if isinstance(self.embs[2].weight.grad, torch.Tensor):
                 # logger.info(self.embs[2].weight.grad.size())
                 # logger.info(self.embs[2].weight.grad)
@@ -248,6 +248,9 @@ class Trainer():
             i = random.choice(list(range(self.langnum-1)))
             x, y = self.get_refine_xy(i, self.langnum-1)
             loss += F.mse_loss(x, y)
+            j = random.choice(list(range(self.langnum-1)))
+            x, y = self.get_refine_xy(self.langnum-1, j)
+            loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():
             logger.error("NaN detected (fool discriminator)")
@@ -260,12 +263,13 @@ class Trainer():
             loss.backward()
             self.ref_optimizer.step()
             self.mapping.orthogonalize()
+            return self.langnum * self.params.batch_size
         elif mode == 'emb':
             self.emb_ref_optimizer.zero_grad()
             loss.backward()
             self.emb_ref_optimizer.step()
+            return 2 * self.params.batch_size
 
-        return self.langnum * self.params.batch_size
 
     def load_training_dico(self, dico_train):
         """
@@ -314,7 +318,7 @@ class Trainer():
         for i in range(self.langnum - 1):
             A = self.embs[i].weight.detach()[self._dicos[i][-1][:, 0]]
             B = self.embs[-1].weight.detach()[self._dicos[i][-1][:, 1]]
-            W = self.mapping.models[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
@@ -366,7 +370,7 @@ class Trainer():
             # save the generator
 
             for i in range(self.langnum-1):
-                W = self.mapping.models[i].weight.detach().cpu().numpy()
+                W = self.mapping.linear[i].weight.detach().cpu().numpy()
                 path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
                 logger.info('* Saving the generator to %s ...', path)
                 torch.save(W, path)
@@ -386,7 +390,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.models[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             assert to_reload.size() == W.size()
             W.data = to_reload.type_as(W)
 
@@ -407,7 +411,7 @@ class Trainer():
             # reload the model
             assert os.path.isfile(path)
             to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.models[i].weight.detach()
+            W = self.mapping.linear[i].weight.detach()
             assert to_reload.size() == W.size()
             W.copy_(to_reload.type_as(W))
 
@@ -434,7 +438,7 @@ class Trainer():
         for j in range(params.langnum-1):
             for i, k in enumerate(range(0, len(embs[j]), bs)):
                 x = embs[j][k:k + bs].to(self.params.device)
-                embs[j][k:k + bs] = self.mapping.models[j](x).detach().cpu()
+                embs[j][k:k + bs] = self.mapping.linear[j](x).detach().cpu()
 
         # write embeddings to the disk
         export_embeddings(embs, params)

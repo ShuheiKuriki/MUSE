@@ -83,7 +83,7 @@ parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb o
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
-parser.add_argument("--dico_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -109,7 +109,8 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 
 # build model / trainer / evaluator
 params.langnum = len(params.langs)
-if not params.emb_file: params.emb_file = 'dumped/' + params.exp_name + '/random_vector/vectors-random.pth'
+if not params.emb_file: params.emb_file = 'dumped/' + params.exp_name + '/random_vector'
+params.emb_file += '/vectors-random.pth'
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)
@@ -175,6 +176,8 @@ if params.adversarial:
 
 trainer.reload_best()
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+logger.info('\n')
+logger.info('----> ADVERSARIAL RESULTS <----\n')
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
 logger.info("__log__:%s\n\n", json.dumps(to_log))
@@ -215,7 +218,7 @@ if params.n_refinement:
         evaluator.all_eval(to_log, params.ref_eval)
 
         # JSON log / save best model / end of epoch
-        logger.info("__log__:%s", json.dumps(to_log))
+        logger.info("__log__:%s\n", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
         trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
 
@@ -223,7 +226,9 @@ if params.n_refinement:
 
 to_log = OrderedDict()
 trainer.reload_best()
+logger.info('\n')
+logger.info('----> FINAL RESULTS <----\n')
 evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
-logger.info("__log__:%s", json.dumps(to_log))
+logger.info("__log__:%s\n", json.dumps(to_log))
 logger.info('end of the examination')

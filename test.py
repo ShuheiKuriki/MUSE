@@ -37,10 +37,10 @@ parser.add_argument("--test", type=bool, default=True, help="test or not")
 parser.add_argument("--langs", type=str, nargs='+', default=['es', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
-parser.add_argument("--univ_vocab", type=int, default=0, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 parser.add_argument("--random_norm", type=float, default=1., help="multiply random embeddings")
 parser.add_argument("--random_init", type=str, default="uniform", help="type of initialize random vectors")
-parser.add_argument("--learnable", type=bool_flag, default=False, help="whether or not random embedding is learnable")
+parser.add_argument("--learnable", type=bool_flag, default=True, help="whether or not random embedding is learnable")
 
 # mapping
 parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initialize the mapping as an identity matrix")
@@ -88,7 +88,6 @@ assert 0 <= params.dis_smooth < 0.5
 assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
-assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 params.langnum = len(params.langs)

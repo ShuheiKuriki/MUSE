@@ -78,7 +78,7 @@ for l in range(params.langnum-1):
     src_path = os.path.join(params.map_path, 'best_mapping{}.pth'.format(l+1))
     logger.info('* Reloading the model from %s ...', src_path)
     assert os.path.isfile(src_path)
-    W = mapping.models[l].weight.detach()
+    W = mapping.linear[l].weight.detach()
     W.copy_(torch.from_numpy(torch.load(src_path)).type_as(W))
 
 # run evaluations

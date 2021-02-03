@@ -6,8 +6,8 @@
 # LICENSE file in the root directory of this source tree.
 #
 # sample excutions
-# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init norm_mean --emb_norm 4.5 --save_univ True
-# python learn_init.py --langs de es random --exp_name twos/de_es/mix --exp_id random_vector --emb_init norm_mean --emb_norm 4.5 --save_univ True
+# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init norm_mean --emb_norm 4.5
+# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init uniform --emb_norm 0.01
 
 import os
 import time
@@ -153,14 +153,10 @@ for n_epoch in range(params.n_epochs):
     logger.info('End of epoch %i.\n\n', n_epoch)
 
     # update the learning rate (stop if too small)
-    trainer.update_lr(to_log, VALIDATION_METRIC)
+    trainer.update_lr(to_log, VALIDATION_METRIC, 'emb')
 
 logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
-to_log = OrderedDict()
-trainer.reload_best()
-evaluator.all_eval(to_log, 'no')
-evaluator.eval_dis(to_log)
 # export embeddings
 # if params.export:
     # trainer.reload_best()

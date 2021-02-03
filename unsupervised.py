@@ -175,6 +175,8 @@ if params.adversarial:
 
 trainer.reload_best()
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+logger.info('\n')
+logger.info('----> ADVERSARIAL RESULTS <----\n')
 evaluator.all_eval(to_log, params.last_eval)
 evaluator.eval_dis(to_log)
 logger.info("__log__:%s\n", json.dumps(to_log))
@@ -223,13 +225,15 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
+logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+
 trainer.reload_best()
 to_log = OrderedDict()
+logger.info('\n')
+logger.info('----> FINAL RESULTS <----\n')
 evaluator.all_eval(to_log, params.last_eval)
 # evaluator.eval_dis(to_log)
 logger.info("__log__:%s\n", json.dumps(to_log))
-
-logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 # export embeddings
 # if params.export:

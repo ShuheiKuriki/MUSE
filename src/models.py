@@ -58,10 +58,10 @@ class Mapping(nn.Module):
         self.map_beta = params.map_beta
         self.langnum = params.langnum
 
-        self.models = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
+        self.linear = nn.ModuleList([nn.Linear(params.emb_dim, params.emb_dim, bias=False) for _ in range(self.langnum-1)])
         if getattr(params, 'map_id_init', True):
             for i in range(self.langnum-1):
-                self.models[i].weight.data = torch.diag(torch.ones(params.emb_dim))
+                self.linear[i].weight.data = torch.diag(torch.ones(params.emb_dim))
 
     def forward(self, x, i, j=None):
         """
@@ -77,8 +77,8 @@ class Mapping(nn.Module):
         """
         beta = self.map_beta
         for i in range(self.langnum-1):
-            W = self.models[i].weight.detach()
-            self.models[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
+            W = self.linear[i].weight.detach()
+            self.linear[i].weight.data = (1 + beta) * W - beta * W.mm(W.transpose(0, 1).mm(W))
 
 class Embedding(nn.Module):
     """
@@ -100,7 +100,7 @@ class Embedding(nn.Module):
 
         for i in range(self.langnum-1):
             self.embs[i].weight.data = _embs[i]
-            self.embs[i].requires_grad = False
+            self.embs[i].weight.requires_grad = False
 
         # set tgt embedding and dico
         if params.langs[-1] == 'random':

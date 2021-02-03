@@ -268,7 +268,7 @@ class Evaluator:
                 real_preds.extend(preds.detach().cpu().tolist())
 
             for j in range(0, self.embs[-1].num_embeddings, bs):
-                emb = self.mapping(self.embs[-1].weight[j:j + bs].detach(), i, rev=True)
+                emb = self.mapping(self.embs[-1].weight[j:j + bs].detach(), i)
                 preds = self.discriminator(emb.detach(), i)
                 fake_preds.extend(preds.detach().cpu().tolist())
 
