@@ -111,7 +111,9 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.langnum = len(params.langs)
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
-if params.learnable: params.last_eval = 'no_target'
+if params.learnable:
+    params.ref_eval = 'no_target'
+    params.last_eval = 'no_target'
 logger = initialize_exp(params)
 mapping, embedding, discriminator = build_model(params)
 trainer = Trainer(mapping, embedding, discriminator, params)

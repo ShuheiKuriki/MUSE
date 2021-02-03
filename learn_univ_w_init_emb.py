@@ -9,9 +9,9 @@ before run this code, initial random embedding should be prepared at --emb_file 
 # LICENSE file in the root directory of this source tree.
 #
 # sample excutions
-# python learn_univ_w_init_emb.py --langs de es fr it pt random --exp_name fives/five+en-like --exp_id mat_lr.3 --emb_lr .3 --device cuda:0
-# python learn_univ_w_init_emb.py --langs de en es fr it pt random --exp_name sixes/six+en-like --exp_id mat_lr.5 --emb_lr .5 --device cuda:0
-# python learn_univ_w_init_emb.py --langs de en es fr it ja pt random --exp_name sevens/seven+en-like --exp_id mat_lr.5 --emb_lr .5 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de es fr it pt random --exp_name fives/five+en-like --exp_id mat_lr.3_S2T2S --emb_lr .3 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de en es fr it pt random --exp_name sixes/six+en-like --exp_id mat_lr.3_S2T2S --emb_lr .3 --device cuda:0
+# python learn_univ_w_init_emb.py --langs de en es fr it ja pt random --exp_name sevens/seven+en-like --exp_id mat_lr.3_S2T2S --emb_lr .3 --device cuda:0
 # python learn_univ_w_init_emb.py --langs de es random --exp_name twos/de_es/en-like --exp_id mat_lr.5  --emb_lr .5 --device cuda:0
 
 import os
