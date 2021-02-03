@@ -65,13 +65,13 @@ class Trainer():
         if params.test:
             logger.info('mapping')
             for param in mapping.parameters():
-                logger.info(param.size())
+                logger.info(param.requires_grad)
             logger.info('embedding')
             for param in embedding.parameters():
-                logger.info(param.size())
+                logger.info(param.requires_grad)
             logger.info('discriminator')
             for param in discriminator.parameters():
-                logger.info(param.size())
+                logger.info(param.requires_grad)
 
         # best validation score
         self.prev_metric = -1e12

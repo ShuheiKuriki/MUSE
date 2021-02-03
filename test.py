@@ -32,7 +32,7 @@ parser.add_argument("--exp_path", type=str, default="", help="Where to store exp
 parser.add_argument("--exp_name", type=str, default="test", help="Experiment name")
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device cpu or cuda:0,1,2,3")
-parser.add_argument("--test", type=bool, default=False, help="test or not")
+parser.add_argument("--test", type=bool, default=True, help="test or not")
 # data
 parser.add_argument("--langs", type=str, nargs='+', default=['es', 'en'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
@@ -87,7 +87,6 @@ assert 0 <= params.dis_smooth < 0.5
 assert params.dis_lambda > 0 and params.dis_steps > 0
 assert 0 < params.lr_shrink <= 1
 assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
-assert params.export in ["", "txt", "pth"]
 
 # build model / trainer / evaluator
 if params.langs[-1] == 'random': params.univ_vocab = 75000

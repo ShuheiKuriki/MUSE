@@ -96,7 +96,9 @@ class Embedding(nn.Module):
 
         self.embs = nn.ModuleList([nn.Embedding(len(params.dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum-1)])
 
-        for i in range(self.langnum-1): self.embs[i].weight.data = _embs[i]
+        for i in range(self.langnum-1):
+            self.embs[i].weight.data = _embs[i]
+            self.embs[i].weight.requires_grad = False
 
         # set tgt embedding and dico
         if params.langs[-1] == 'random':
