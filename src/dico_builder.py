@@ -145,7 +145,7 @@ def build_dictionary(src_emb, tgt_emb, params, s2t_candidates=None, t2s_candidat
     """
     Build a training dictionary given current embeddings / mapping.
     """
-    logger.info("Building the train dictionary ...")
+    # logger.info("Building the train dictionary ...")
     s2t = 'S2T' in params.dico_build
     t2s = 'T2S' in params.dico_build
     assert s2t or t2s
