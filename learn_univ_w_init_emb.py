@@ -220,9 +220,11 @@ if params.n_refinement:
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s\n", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb_ref')
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
+
+    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 to_log = OrderedDict()
 trainer.reload_best()

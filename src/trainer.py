@@ -333,10 +333,13 @@ class Trainer():
             optimizer = self.emb_optimizer
         elif mode == 'ref':
             optimizer = self.ref_optimizer
+        elif mode == 'emb_ref':
+            optimizer = self.emb_ref_optimizer
 
         if mode == 'map' and self.params.map_optimizer[:3] != 'sgd': return
         if mode == 'emb' and self.params.emb_optimizer[:3] != 'sgd': return
         if mode == 'ref' and self.params.ref_optimizer[:3] != 'sgd': return
+        if mode == 'emb_ref' and self.params.emb_ref_optimizer[:3] != 'sgd': return
 
         old_lr = optimizer.param_groups[0]['lr']
         new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
