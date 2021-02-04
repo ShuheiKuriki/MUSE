@@ -303,6 +303,7 @@ class Trainer():
         for i in range(self.langnum):
             for j in range(self.langnum):
                 if i < j:
+                    logger.info("Building the train dictionary between %s and %s", self.params.langs[i], self.params.langs[j])
                     self._dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
                 elif i > j:
                     self._dicos[i][j] = self._dicos[j][i][:, [1, 0]]
@@ -373,15 +374,14 @@ class Trainer():
             # save the generator
 
             for i in range(self.langnum-1):
-                W = self.mapping.linear[i].weight.detach().cpu().numpy()
                 path = os.path.join(self.params.exp_path, 'best_mapping{}.pth'.format(i+1))
                 logger.info('* Saving the generator to %s ...', path)
-                torch.save(W, path)
+                torch.save(self.mapping.linear[i].weight.detach().cpu(), path)
 
             if self.params.learnable:
                 path = os.path.join(self.params.exp_path, 'vectors-%s.pth' % self.params.langs[-1])
                 logger.info('Writing universal embeddings to %s ...', path)
-                torch.save(self.embs[-1].weight.data.to('cpu'), path)
+                torch.save(self.embs[-1].weight.detach().cpu(), path)
 
     def reload_best(self):
         """
@@ -392,10 +392,7 @@ class Trainer():
             logger.info('* Reloading the best model from %s ...', path)
             # reload the model
             assert os.path.isfile(path)
-            to_reload = torch.from_numpy(torch.load(path))
-            W = self.mapping.linear[i].weight.detach()
-            assert to_reload.size() == W.size()
-            W.data = to_reload.type_as(W)
+            self.mapping.linear[i].weight.data = torch.load(path).to(self.params.device)
 
         if self.params.learnable:
             path = os.path.join(self.params.exp_path, 'vectors-%s.pth' % self.params.langs[-1])
