@@ -228,7 +228,7 @@ if params.n_refinement:
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb')
+        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb_ref')
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
