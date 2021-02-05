@@ -41,7 +41,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID(folder
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
-parser.add_argument("--ref_eval", type=str, default="no", help="evaluation type during refinement")
+parser.add_argument("--ref_eval", type=str, default="all", help="evaluation type during refinement")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
@@ -112,7 +112,9 @@ VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
 params.langnum = len(params.langs)
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
-if params.learnable: params.last_eval = 'no_target'
+if params.learnable:
+    params.last_eval = 'no_target'
+    params.ref_eval = 'no_target'
 logger = initialize_exp(params)
 mapping, embedding, discriminator = build_model(params)
 trainer = Trainer(mapping, embedding, discriminator, params)
@@ -160,8 +162,8 @@ if params.adversarial:
                 for k, _ in stats_str: del stats[k][:]
 
         # embeddings / discriminator evaluation
-        to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-        evaluator.all_eval(to_log, 'no')
+        to_log = OrderedDict({'n_epoch': str(n_epoch), 'tgt_norm': tgt_norm.item()})
+        evaluator.all_eval(to_log, params.adv_eval)
         evaluator.eval_dis(to_log)
         logger.info("__log__:%s", json.dumps(to_log))
 
@@ -172,7 +174,7 @@ if params.adversarial:
         # update the learning rate (stop if too small)
         trainer.update_lr(to_log, VALIDATION_METRIC)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    logger.info('The best metric is %.4f, %s epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 trainer.reload_best()
 
@@ -225,7 +227,7 @@ if params.n_refinement:
         trainer.save_best(to_log, VALIDATION_METRIC)
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
+    logger.info('The best metric is %.4f, %s epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
 trainer.reload_best()
 logger.info('\n')
