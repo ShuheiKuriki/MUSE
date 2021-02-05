@@ -169,8 +169,8 @@ class Evaluator:
         Mean-cosine model selection criterion.
         """
         # get normalized embeddings
-        src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
-        tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
+        src_emb = self.mapping(self.embs[i].weight, i).detach()
+        tgt_emb = self.mapping(self.embs[j].weight, j).detach()
         src_emb = src_emb / src_emb.norm(2, 1, keepdim=True).expand_as(src_emb)
         tgt_emb = tgt_emb / tgt_emb.norm(2, 1, keepdim=True).expand_as(tgt_emb)
 

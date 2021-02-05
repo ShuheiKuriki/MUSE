@@ -83,7 +83,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self, i, j):
+    def get_dis_xy(self, i, j, mode='dis'):
         """
         Get discriminator input batch / output target.
         """
@@ -92,7 +92,7 @@ class Trainer():
         mf = self.params.dis_most_frequent
         rv = self.params.univ_vocab
         langnum = self.langnum
-        assert mf <= min(map(len, self.dicos[:-1]))
+        assert mf <= min(map(len, self.vocabs[:-1]))
 
         # get ids
         if self.params.test:
@@ -106,8 +106,14 @@ class Trainer():
             tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
-        src_emb = self.mapping(self.embs[i](src_ids), i, j)
-        tgt_emb = self.embs[j](tgt_ids)
+        if mode != 'emb':
+            src_emb = self.embs[i](src_ids).detach()
+            tgt_emb = self.embs[j](tgt_ids).detach()
+        else:
+            src_emb = self.embs[i](src_ids)
+            tgt_emb = self.embs[j](tgt_ids)
+
+        src_emb = self.mapping(src_emb, i, j)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
@@ -126,7 +132,7 @@ class Trainer():
 
         return x, y
 
-    def get_refine_xy(self, i, j):
+    def get_refine_xy(self, i, j, mode='map'):
         """
         Get input batch / output target for MPSR.
         """
@@ -139,8 +145,14 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        x = self.mapping(self.embs[i](src_ids), i, j)
-        y = self.embs[j](tgt_ids)
+        if mode == 'map':
+            src_emb = self.embs[i](src_ids).detach()
+            y = self.embs[j](tgt_ids).detach()
+        elif mode == 'emb':
+            src_emb = self.embs[i](src_ids)
+            y = self.embs[j](tgt_ids)
+
+        x = self.mapping(src_emb, i, j)
 
         return x, y
 
@@ -157,8 +169,8 @@ class Trainer():
             # random select a source language
             i = random.choice(list(range(self.langnum)))
 
-            x, y = self.get_dis_xy(i, j)
-            preds = self.discriminator(x, j)
+            x, y = self.get_dis_xy(i, j, mode='dis')
+            preds = self.discriminator(x.detach(), j)
             loss += F.binary_cross_entropy(preds, y)
 
         if self.params.test:
@@ -197,13 +209,13 @@ class Trainer():
             for i in range(self.langnum):
                 # randomly select a target language
                 j = random.choice(list(range(self.langnum)))
-                x, y = self.get_dis_xy(i, j)
+                x, y = self.get_dis_xy(i, j, mode='map')
                 preds = self.discriminator(x, j)
                 loss += F.binary_cross_entropy(preds, 1-y)
         elif mode == 'emb':
             # randomly select a source language
             i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_dis_xy(i, self.langnum-1)
+            x, y = self.get_dis_xy(i, self.langnum-1, mode='emb')
             preds = self.discriminator(x, self.langnum-1)
             loss += F.binary_cross_entropy(preds, 1-y)
 
@@ -241,15 +253,15 @@ class Trainer():
             for i in range(self.langnum):
                 # randomly select a target language
                 j = random.choice(list(range(self.langnum)))
-                x, y = self.get_refine_xy(i, j)
+                x, y = self.get_refine_xy(i, j, mode='map')
                 loss += F.mse_loss(x, y)
         elif mode == 'emb':
             # randomly select a target language
             i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(i, self.langnum-1)
+            x, y = self.get_refine_xy(i, self.langnum-1, mode='emb')
             loss += F.mse_loss(x, y)
             j = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(self.langnum-1, j)
+            x, y = self.get_refine_xy(self.langnum-1, j, mode='emb')
             loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():
@@ -264,11 +276,12 @@ class Trainer():
             self.ref_optimizer.step()
             self.mapping.orthogonalize()
             return self.langnum * self.params.batch_size
-        elif mode == 'emb':
+        if mode == 'emb':
             self.emb_ref_optimizer.zero_grad()
             loss.backward()
             self.emb_ref_optimizer.step()
             return 2 * self.params.batch_size
+        return 0
 
 
     def load_training_dico(self, dico_train):
