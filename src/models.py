@@ -110,7 +110,7 @@ class Embedding(nn.Module):
         self.embs.append(nn.Embedding(len(params.dicos[-1]), params.emb_dim, sparse=False))
         self.embs[-1].weight.data = _embs[-1]
 
-        if params.learnable: self.embs[-1].weight.requires_grad = True
+        if not params.learnable: self.embs[-1].weight.requires_grad = False
 
     def initialize_random(self, params):
         """
