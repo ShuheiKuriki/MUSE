@@ -24,8 +24,8 @@ def get_candidates(emb1, emb2, params):
     all_targets = []
 
     # n_src : number of source words to consider
-    # n_src = emb1.size(0)
-    n_src = emb2.size(0)
+    n_src = emb1.size(0)
+    # n_src = emb2.size(0)
     if params.dico_max_rank > 0 and not params.dico_method.startswith('invsm_beta_'):
         n_src = min(params.dico_max_rank, n_src)
 

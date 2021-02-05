@@ -34,7 +34,7 @@ class Evaluator:
         """
         self.embs = trainer.embs
         self.embedding = trainer.embedding
-        self.dicos = trainer.dicos
+        self.vocabs = trainer.vocabs
         self.mapping = trainer.mapping
         self.discriminator = trainer.discriminator
         self.params = trainer.params
@@ -46,7 +46,7 @@ class Evaluator:
         Evaluation on monolingual word similarity.
         """
         emb = self.embs[i].weight.detach()
-        ws_scores = get_wordsim_scores(self.dicos[i].lang, self.dicos[i].word2id, emb.detach().cpu().numpy())
+        ws_scores = get_wordsim_scores(self.vocabs[i].lang, self.vocabs[i].word2id, emb.detach().cpu().numpy())
         if ws_scores is not None:
             ws_monolingual_scores = np.mean(list(ws_scores.values()))
             logger.info("%s Monolingual word similarity score average: %.5f", self.params.langs[i], ws_monolingual_scores)
@@ -86,8 +86,8 @@ class Evaluator:
         tgt_emb = tgt_emb.detach().cpu().numpy()
         # cross-lingual wordsim evaluation
         src_tgt_ws_scores = get_crosslingual_wordsim_scores(
-            self.dicos[i].lang, self.dicos[i].word2id, src_emb,
-            self.dicos[j].lang, self.dicos[j].word2id, tgt_emb
+            self.vocabs[i].lang, self.vocabs[i].word2id, src_emb,
+            self.vocabs[j].lang, self.vocabs[j].word2id, tgt_emb
         )
         if src_tgt_ws_scores is None: return
         ws_crosslingual_scores = np.mean(list(src_tgt_ws_scores.values()))
@@ -107,7 +107,7 @@ class Evaluator:
         src_emb = self.mapping(self.embs[i].weight.detach(), i).detach()
         tgt_emb = self.mapping(self.embs[j].weight.detach(), j).detach()
         for method in ['nn', 'csls_knn_10']:
-            results = get_word_translation_accuracy(self.dicos[i].lang, self.dicos[i].word2id, src_emb, self.dicos[j].lang, self.dicos[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
+            results = get_word_translation_accuracy(self.vocabs[i].lang, self.vocabs[i].word2id, src_emb, self.vocabs[j].lang, self.vocabs[j].word2id, tgt_emb, method=method, dico_eval=self.params.dico_eval)
             if results is None: return
             # to_log.update([('%s-%s' % (k, method), v) for k, v in results])
             for k, v in results:
@@ -121,8 +121,8 @@ class Evaluator:
         Evaluation on sentence translation.
         Only available on Europarl, for en - {de, es, fr, it} language pairs.
         """
-        lg1 = self.dicos[i].lang
-        lg2 = self.dicos[j].lang
+        lg1 = self.vocabs[i].lang
+        lg2 = self.vocabs[j].lang
 
         # parameters
         n_keys = 200000
@@ -147,8 +147,8 @@ class Evaluator:
             # source <- target sentence translation
             results = get_sent_translation_accuracy(
                 self.europarl_data,
-                self.dicos[i].lang, self.dicos[i].word2id, src_emb,
-                self.dicos[j].lang, self.dicos[j].word2id, tgt_emb,
+                self.vocabs[i].lang, self.vocabs[i].word2id, src_emb,
+                self.vocabs[j].lang, self.vocabs[j].word2id, tgt_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )
@@ -157,8 +157,8 @@ class Evaluator:
             # target <- source sentence translation
             results = get_sent_translation_accuracy(
                 self.europarl_data,
-                self.dicos[i].lang, self.dicos[i].word2id, tgt_emb,
-                self.dicos[j].lang, self.dicos[j].word2id, src_emb,
+                self.vocabs[i].lang, self.vocabs[i].word2id, tgt_emb,
+                self.vocabs[j].lang, self.vocabs[j].word2id, src_emb,
                 n_keys=n_keys, n_queries=n_queries,
                 method=method, idf=idf
             )

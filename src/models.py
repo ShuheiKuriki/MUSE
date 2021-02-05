@@ -92,11 +92,11 @@ class Embedding(nn.Module):
         self.langnum = params.langnum
 
         # set src embeddings and dicos
-        params.dicos, _embs = [0]*self.langnum, [0]*self.langnum
+        params.vocabs, _embs = [0]*self.langnum, [0]*self.langnum
         for i in range(self.langnum-1):
-            params.dicos[i], _embs[i] = load_embeddings(params, i)
+            params.vocabs[i], _embs[i] = load_embeddings(params, i)
 
-        self.embs = nn.ModuleList([nn.Embedding(len(params.dicos[i]), params.emb_dim, sparse=False) for i in range(self.langnum-1)])
+        self.embs = nn.ModuleList([nn.Embedding(len(params.vocabs[i]), params.emb_dim, sparse=False) for i in range(self.langnum-1)])
 
         for i in range(self.langnum-1):
             self.embs[i].weight.data = _embs[i]
@@ -104,12 +104,12 @@ class Embedding(nn.Module):
 
         # set tgt embedding and dico
         if params.langs[-1] == 'random':
-            params.dicos[-1], _embs[-1] = [0]*params.univ_vocab, self.initialize_random(params)
+            params.vocabs[-1], _embs[-1] = [0]*params.univ_vocab, self.initialize_random(params)
         else:
             if params.learnable: params.max_vocab = params.univ_vocab
-            params.dicos[-1], _embs[-1] = load_embeddings(params, params.langnum-1)
+            params.vocabs[-1], _embs[-1] = load_embeddings(params, params.langnum-1)
 
-        self.embs.append(nn.Embedding(len(params.dicos[-1]), params.emb_dim, sparse=False))
+        self.embs.append(nn.Embedding(len(params.vocabs[-1]), params.emb_dim, sparse=False))
         self.embs[-1].weight.data = _embs[-1]
 
         if not params.learnable: self.embs[-1].weight.requires_grad = False

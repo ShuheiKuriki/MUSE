@@ -37,12 +37,12 @@ class Trainer():
 
         self.embedding = embedding
         self.embs = embedding.embs
-        self.dicos = params.dicos
+        self.vocabs = params.vocabs
         self.mapping = mapping
         self.discriminator = discriminator
         self.params = params
         self.langnum = self.params.langnum
-        self._dicos = [[0]*self.langnum for _ in range(self.langnum)]
+        self.dicos = [[0]*self.langnum for _ in range(self.langnum)]
 
         # optimizers
         if hasattr(params, 'map_optimizer'):
@@ -132,7 +132,7 @@ class Trainer():
         """
         # select random word IDs
         bs = self.params.batch_size
-        dico = self._dicos[i][j]
+        dico = self.dicos[i][j]
         indices = torch.from_numpy(np.random.randint(0, len(dico), bs)).to(self.params.device)
         dico = dico.index_select(0, indices)
         src_ids = dico[:, 0].to(self.params.device)
@@ -158,7 +158,7 @@ class Trainer():
             i = random.choice(list(range(self.langnum)))
 
             x, y = self.get_dis_xy(i, j)
-            preds = self.discriminator(x.detach(), j)
+            preds = self.discriminator(x, j)
             loss += F.binary_cross_entropy(preds, y)
 
         if self.params.test:
@@ -275,28 +275,33 @@ class Trainer():
         """
         Load training dictionary.
         """
-        word2id1 = self.dicos[0].word2id
-        word2id2 = self.dicos[1].word2id
+        for i in range(self.params.langnum):
+            for j in range(self.params.langnum):
+                if i == j:
+                    idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
+                    self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
+                else:
+                    word2id1 = self.vocabs[i].word2id
+                    word2id2 = self.vocabs[j].word2id
 
-        # identical character strings
-        if dico_train == "identical_char":
-            self._dicos[0][1] = load_identical_char_dico(word2id1, word2id2)
-        # use one of the provided dictionary
-        elif dico_train == "default":
-            filename = f'{self.params.langs[0]}-{self.params.langs[1]}.0-5000.txt'
-            self._dicos[0][1] = load_dictionary(os.path.join(DIC_EVAL_PATH, filename), word2id1, word2id2)
-        # dictionary provided by the user
-        else:
-            self._dicos[0][1] = load_dictionary(dico_train, word2id1, word2id2)
+                    # identical character strings
+                    if dico_train == "identical_char":
+                        self.dicos[i][j] = load_identical_char_dico(word2id1, word2id2)
+                    # use one of the provided dictionary
+                    elif dico_train == "default":
+                        filename = f'{self.params.langs[i]}-{self.params.langs[j]}.0-5000.txt'
+                        self.dicos[i][j] = load_dictionary(os.path.join(DIC_EVAL_PATH, filename), word2id1, word2id2)
+                    # dictionary provided by the user
+                    else:
+                        self.dicos[i][j] = load_dictionary(dico_train, word2id1, word2id2)
 
-        # cuda
-        self._dicos[0][1] = self._dicos[0][1].to(self.params.device)
+                    # cuda
+                    self.dicos[i][j] = self.dicos[i][j].to(self.params.device)
 
     def build_dictionary(self):
         """
         Build a dictionary from aligned embeddings.
         """
-        self._dicos = [[0]*self.langnum for _ in range(self.langnum)]
         embs = [self.mapping(self.embs[i].weight, i).detach() for i in range(self.langnum)]
         embs = [embs[i] / embs[i].norm(2, 1, keepdim=True).expand_as(embs[i]) for i in range(self.langnum)]
 
@@ -304,12 +309,12 @@ class Trainer():
             for j in range(self.langnum):
                 if i < j:
                     logger.info("Building the train dictionary between %s and %s", self.params.langs[i], self.params.langs[j])
-                    self._dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
+                    self.dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
                 elif i > j:
-                    self._dicos[i][j] = self._dicos[j][i][:, [1, 0]]
+                    self.dicos[i][j] = self.dicos[j][i][:, [1, 0]]
                 else:
                     idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
-                    self._dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
+                    self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
 
     def procrustes(self):
         """
@@ -317,8 +322,8 @@ class Trainer():
         https://en.wikipedia.org/wiki/Orthogonal_Procrustes_problem
         """
         for i in range(self.langnum - 1):
-            A = self.embs[i].weight.detach()[self._dicos[i][-1][:, 0]]
-            B = self.embs[-1].weight.detach()[self._dicos[i][-1][:, 1]]
+            A = self.embs[i].weight.detach()[self.dicos[i][-1][:, 0]]
+            B = self.embs[-1].weight.detach()[self.dicos[i][-1][:, 1]]
             W = self.mapping.linear[i].weight.detach()
             M = B.transpose(0, 1).mm(A).cpu().numpy()
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)

@@ -13,6 +13,8 @@ import os
 import json
 import argparse
 from collections import OrderedDict
+import numpy as np
+import time
 import torch
 
 from src.utils import bool_flag, initialize_exp
@@ -29,6 +31,8 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--ref_eval", type=str, default="all", help="evaluation type during refinement (no / only_target / no_target / all)")
+parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last (no / only_target / no_target / all)")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, nargs='+', default=['es', 'en'], help="languages")
@@ -41,6 +45,9 @@ parser.add_argument("--map_id_init", type=bool_flag, default=True, help="Initial
 parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orthogonalization")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+parser.add_argument("--ref_optimizer", type=str, default="adam", help="Multilingual Pseudo-Supervised Refinement optimizer")
+parser.add_argument("--ref_n_steps", type=int, default=30000, help="Number of optimization steps for MPSR")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_train", type=str, default="default", help="Path to training dictionary (default: use identical character strings)")
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
@@ -68,7 +75,7 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 # build logger / model / trainer / evaluator
-params.langnum = 2
+params.langnum = len(params.langs)
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 logger = initialize_exp(params)
 mapping, embedding, _ = build_model(params, False)
@@ -86,32 +93,45 @@ VALIDATION_METRIC = VALIDATION_METRIC_UNSUP if params.dico_train == 'identical_c
 logger.info("Validation metric: %s", VALIDATION_METRIC)
 
 
-# Learning loop for Procrustes Iterative Learning
+# Learning loop for MPSR
 for n_epoch in range(params.n_refinement+1):
 
     logger.info('Starting epoch %i...', n_epoch)
 
     # build a dictionary from aligned embeddings (unless
     # it is the first iteration and we use the init one)
-    if n_epoch > 0: trainer.build_dictionary()
+    if n_epoch > 0 or not hasattr(trainer, 'dicos'): trainer.build_dictionary()
 
-    # apply the Procrustes solution
-    trainer.procrustes()
+    # optimize MPSR
+    tic = time.time()
+    n_words_ref = 0
+    stats = {'REFINE_COSTS': []}
+    for n_iter in range(params.ref_n_steps):
+        # mpsr training step
+        n_words_ref += trainer.refine_step(stats)
+        # log stats
+        if n_iter % 500 == 0:
+            stats_str = [('REFINE_COSTS', 'REFINE loss')]
+            stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
+            stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
+            logger.info('%06i - %s', n_iter, ' - '.join(stats_log))
+            # reset
+            tic = time.time()
+            n_words_ref = 0
+            for k, _ in stats_str: del stats[k][:]
 
     # embeddings evaluation
     to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': torch.mean(torch.norm(embedding.embs[-1].weight, dim=1)).item()})
-    evaluator.all_eval(to_log, 'all')
+    evaluator.all_eval(to_log, params.ref_eval)
 
     # JSON log / save best model / end of epoch
     logger.info("__log__:%s", json.dumps(to_log))
     trainer.save_best(to_log, VALIDATION_METRIC)
     logger.info('End of epoch %i.\n\n', n_epoch)
 
-logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
-
 trainer.reload_best()
-to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': ""})
-evaluator.all_eval(to_log, 'all')
+to_log = OrderedDict({'n_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+evaluator.all_eval(to_log, params.last_eval)
 logger.info("__log__:%s", json.dumps(to_log))
 
 # export embeddings

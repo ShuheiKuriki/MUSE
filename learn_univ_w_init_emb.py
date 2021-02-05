@@ -36,9 +36,9 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training")
-parser.add_argument("--ref_eval", type=str, default="no_target", help="evaluation type during refinement")
-parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last")
+parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training (no / only_target / no_target / all)")
+parser.add_argument("--ref_eval", type=str, default="no_target", help="evaluation type during refinement (no / only_target / no_target / all)")
+parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last (no / only_target / no_target / all)")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', 'it', 'pt', 'en'], help="languages")
@@ -118,7 +118,6 @@ mappings, embedding, discriminator = build_model(params)
 trainer = Trainer(mappings, embedding, discriminator, params)
 evaluator = Evaluator(trainer)
 
-
 # Learning loop for Adversarial Training
 if params.adversarial:
     logger.info('\n\n')
@@ -172,8 +171,6 @@ if params.adversarial:
 
         logger.info('End of epoch %i.\n\n', n_epoch)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
-
 trainer.reload_best()
 to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
 logger.info('\n')
@@ -224,10 +221,9 @@ if params.n_refinement:
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 
-    logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
-
 to_log = OrderedDict()
 trainer.reload_best()
+to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
 logger.info('\n')
 logger.info('----> FINAL RESULTS <----\n')
 evaluator.all_eval(to_log, params.last_eval)
