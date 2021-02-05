@@ -67,8 +67,8 @@ class Mapping(nn.Module):
         """
         map into target space
         """
-        if i % self.langnum < self.langnum-1: x = self.linear[i](x)
-        if j is None or (j % self.langnum == self.langnum-1): return x
+        if i < self.langnum-1: x = self.linear[i](x)
+        if j is None or j == self.langnum-1: return x
         return F.linear(x, self.linear[j].weight.t())
 
     def orthogonalize(self):

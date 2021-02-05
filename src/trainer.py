@@ -79,7 +79,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self):
+    def get_dis_xy(self, mode='dis'):
         """
         Get discriminator input batch / output target.
         """
@@ -100,7 +100,11 @@ class Trainer():
 
         # get word embeddings
         embs = [0]*langnum
-        for i in range(langnum): embs[i] = self.mapping(self.embs[i](ids[i]), i)
+        for i in range(langnum):
+            if mode != 'emb':
+                embs[i] = self.mapping(self.embs[i](ids[i]).detach(), i)
+            else:
+                embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
@@ -119,7 +123,7 @@ class Trainer():
 
         return x, y
 
-    def get_refine_xy(self, i, j):
+    def get_refine_xy(self, i, j, mode='map'):
         """
         Get input batch / output target for MPSR.
         """
@@ -132,7 +136,10 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        x = self.mapping(self.embs[i](src_ids), i, j)
+        if mode == 'map':
+            x = self.mapping(self.embs[i](src_ids).detach(), i, j)
+        else:
+            x = self.mapping(self.embs[i](src_ids), i, j)
         y = self.embs[j](tgt_ids)
 
         return x, y
@@ -144,8 +151,8 @@ class Trainer():
         self.discriminator.train()
 
         # loss
-        x, y = self.get_dis_xy()
-        preds = self.discriminator(x)
+        x, y = self.get_dis_xy(mode='dis')
+        preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
             # logger.info(torch.exp(preds[:10]))
@@ -184,7 +191,7 @@ class Trainer():
         self.discriminator.eval()
 
         # loss
-        x, y = self.get_dis_xy()
+        x, y = self.get_dis_xy(mode=mode)
         preds = self.discriminator(x)
         if self.params.test:
             logger.info('%s_start', mode)
@@ -225,11 +232,11 @@ class Trainer():
         if mode == 'map':
             for i in range(self.langnum):
                 j = random.choice(list(range(self.langnum)))
-                x, y = self.get_refine_xy(i, j)
+                x, y = self.get_refine_xy(i, j, mode=mode)
                 loss += F.mse_loss(x, y)
         elif mode == 'emb':
             i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(self.langnum-1, i)
+            x, y = self.get_refine_xy(self.langnum-1, i, mode=mode)
             loss += F.mse_loss(x, y)
         # check NaN
         if (loss != loss).any():
