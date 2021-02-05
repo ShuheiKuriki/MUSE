@@ -135,7 +135,7 @@ if params.adversarial:
             # log stats
             if n_iter % 500 == 0:
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight.detach(), dim=1))
                 stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_proc / (time.time() - tic)))
                 stats_log = ' - '.join(stats_log)
@@ -189,7 +189,7 @@ if params.n_refinement:
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
-                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))
+                tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight.detach(), dim=1))
                 stats_log.append('Target emb Norm: %.4f' % tgt_norm)
                 stats_log.append('%i samples/s' % int(n_words_ref / (time.time() - tic)))
                 logger.info('%06i - %s', n_iter, ' - '.join(stats_log))
