@@ -41,7 +41,7 @@ parser.add_argument("--exp_id", type=str, default="", help="Experiment ID(folder
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training (no / only_target / no_target / all)")
-parser.add_argument("--ref_eval", type=str, default="only_target", help="evaluation type during refinement (no / only_target / no_target / all)")
+parser.add_argument("--ref_eval", type=str, default="all", help="evaluation type during refinement (no / only_target / no_target / all)")
 parser.add_argument("--last_eval", type=str, default="all", help="evaluation type last (no / only_target / no_target / all)")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
@@ -88,7 +88,7 @@ parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold c
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
+parser.add_argument("--metric_size", type=int, default=15000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -172,7 +172,8 @@ if params.adversarial:
         logger.info('End of epoch %i.\n\n', n_epoch)
 
         # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC)
+        if params.learnable: trainer.update_lr(to_log, VALIDATION_METRIC, modes=['map', 'emb'])
+        else: trainer.update_lr(to_log, VALIDATION_METRIC)
 
 trainer.reload_best()
 
@@ -201,8 +202,8 @@ if params.n_refinement:
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
             # mpsr training step
-            n_words_ref += trainer.refine_step(stats, mode='map')
-            if params.learnable: n_words_ref += trainer.refine_step(stats, mode='emb')
+            n_words_ref += trainer.refine_step(stats)
+            # if params.learnable: n_words_ref += trainer.refine_step(stats)
             # log stats
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
