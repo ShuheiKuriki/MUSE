@@ -144,8 +144,7 @@ if params.adversarial:
                 for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(mode='map')
-            if params.learnable: n_words_proc += trainer.gen_step(mode='emb')
+            n_words_proc += trainer.gen_step()
 
             # log stats
             if n_iter % 500 == 0:

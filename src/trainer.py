@@ -79,7 +79,7 @@ class Trainer():
 
         self.decrease_lr = False
 
-    def get_dis_xy(self, mode='dis'):
+    def get_dis_xy(self):
         """
         Get discriminator input batch / output target.
         """
@@ -101,10 +101,7 @@ class Trainer():
         # get word embeddings
         embs = [0]*langnum
         for i in range(langnum):
-            if mode != 'emb':
-                embs[i] = self.mapping(self.embs[i](ids[i]).detach(), i)
-            else:
-                embs[i] = self.mapping(self.embs[i](ids[i]), i)
+            embs[i] = self.mapping(self.embs[i](ids[i]), i)
 
         # if self.params.test:
             # logger.info('mean of absolute value of mapping %i is %.10f', 0, torch.mean(torch.abs(self.mapping.linear[1].weight)))
@@ -148,7 +145,7 @@ class Trainer():
         self.discriminator.train()
 
         # loss
-        x, y = self.get_dis_xy(mode='dis')
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x.detach())
         if self.params.test:
             logger.info('dis_start')
@@ -181,17 +178,17 @@ class Trainer():
             # logger.info(self.mapping.linear[0].weight[0][:10])
             # logger.info('Discriminator loss %.4f', new_loss)
 
-    def gen_step(self, mode='map'):
+    def gen_step(self):
         """
         Fooling discriminator training step.
         """
         self.discriminator.eval()
 
         # loss
-        x, y = self.get_dis_xy(mode=mode)
+        x, y = self.get_dis_xy()
         preds = self.discriminator(x)
         if self.params.test:
-            logger.info('%s_start', mode)
+            logger.info('gen_start')
         #     logger.info(torch.exp(preds[:10]))
         #     logger.info(self.mapping.linear[0].weight[0][:10])
 
@@ -203,20 +200,18 @@ class Trainer():
             sys.exit()
 
         # optim
-        if mode == 'map':
-            self.map_optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
-            self.map_optimizer.step()
-            self.mapping.orthogonalize()
-        elif mode == 'emb':
-            self.emb_optimizer.zero_grad()
-            loss.backward()
+        self.map_optimizer.zero_grad()
+        if self.params.learnable: self.emb_optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
+        self.map_optimizer.step()
+        self.mapping.orthogonalize()
+        if self.params.learnable:
             torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
             self.emb_optimizer.step()
 
         if self.params.test:
-            logger.info('after_%s', mode)
+            logger.info('after_gen')
             logger.info(self.discriminator.layers[1].weight.grad[0][:10])
 
         return self.langnum * self.params.batch_size
