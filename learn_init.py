@@ -6,8 +6,10 @@
 # LICENSE file in the root directory of this source tree.
 #
 # sample excutions
-# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init norm_mean --emb_norm 4.5
-# python learn_init.py --langs en random --exp_name inits --exp_id en-like --emb_init uniform --emb_norm 0.01
+# python learn_init.py --langs de es random --exp_name inits --exp_id mat-init_de-es-rand
+# python learn_init.py --langs de es fr it pt random --exp_name inits --exp_id mat-init_five-rand
+# python learn_init.py --langs de en es fr it pt random --exp_name inits --exp_id mat-init_six-rand
+# python learn_init.py --langs de en es fr it ja pt random --exp_name inits --exp_id mat-init_seven-rand
 
 import os
 import time

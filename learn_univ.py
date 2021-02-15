@@ -7,7 +7,8 @@
 #
 # python learn_univ.py --exp_name twos/de_es/uniform --exp_id mat --langs de es random --device cuda:0
 # python learn_univ.py --exp_name fives/uniform --exp_id mat --langs de es fr it pt random --device cuda:0
-# python learn_univ.py --exp_name sixes/uniform --exp_id mat --langs de es fr it pt en random --device cuda:0
+# python learn_univ.py --exp_name sixes/uniform --exp_id mat --langs de en es fr it pt random --device cuda:0
+# python learn_univ.py --exp_name sevens/uniform --exp_id mat --langs de en es fr it ja pt random --device cuda:0
 
 import os
 import time
@@ -31,7 +32,7 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
-parser.add_argument("--adv_eval", type=str, default="no_target", help="evaluation type during adversarial training (no / only_target / no_target / all)")
+parser.add_argument("--adv_eval", type=str, default="no", help="evaluation type during adversarial training (no / only_target / no_target / all)")
 parser.add_argument("--ref_eval", type=str, default="no_target", help="evaluation type during refinement (no / only_target / no_target / all)")
 parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last (no / only_target / no_target / all)")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
