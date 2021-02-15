@@ -58,7 +58,7 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=5, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=3, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
@@ -76,7 +76,7 @@ parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate 
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=10, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="map optimizer when refine")
 parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb optimizer when refine")
@@ -88,7 +88,7 @@ parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold c
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
+parser.add_argument("--metric_size", type=int, default=15000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -141,8 +141,7 @@ if params.adversarial:
                 for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
             # mapping training (discriminator fooling)
-            n_words_proc += trainer.gen_step(mode='map')
-            if n_epoch >= params.random_start: trainer.gen_step(mode='emb')
+            n_words_proc += trainer.gen_step()
 
             # log stats
             if n_iter % 500 == 0:
@@ -167,7 +166,7 @@ if params.adversarial:
         # save best model / end of epoch
         trainer.save_best(to_log, VALIDATION_METRIC)
         # update the learning rate (stop if too small)
-        trainer.update_lr(to_log, VALIDATION_METRIC, mode='map')
+        trainer.update_lr(to_log, VALIDATION_METRIC, modes=['map', 'emb'])
 
         logger.info('End of epoch %i.\n\n', n_epoch)
 
@@ -197,8 +196,7 @@ if params.n_refinement:
         n_words_ref = 0
         stats = {'REFINE_COSTS': []}
         for n_iter in range(params.ref_steps):
-            n_words_ref += trainer.refine_step(stats, mode='map')
-            n_words_ref += trainer.refine_step(stats, mode='emb')
+            n_words_ref += trainer.refine_step(stats)
             if n_iter % 500 == 0:
                 stats_str = [('REFINE_COSTS', 'Refine loss')]
                 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
@@ -217,7 +215,7 @@ if params.n_refinement:
         # JSON log / save best model / end of epoch
         logger.info("__log__:%s\n", json.dumps(to_log))
         trainer.save_best(to_log, VALIDATION_METRIC)
-        trainer.update_lr(to_log, VALIDATION_METRIC, mode='emb_ref')
+        trainer.update_lr(to_log, VALIDATION_METRIC, modes=['ref', 'emb_ref'])
 
         logger.info('End of refinement iteration %i.\n\n', n_epoch)
 

@@ -106,8 +106,7 @@ stats_str = [('DIS_COSTS', 'Discriminator loss')]
 # discriminator training
 for _ in range(params.test_epochs):
     trainer.dis_step(stats)
-    trainer.gen_step(mode='map')
-    trainer.gen_step(mode='emb')
+    trainer.gen_step()
 
 stats_log = ['%s: %.4f' % (v, np.mean(stats[k])) for k, v in stats_str if len(stats[k])]
 tgt_norm = torch.mean(torch.norm(embedding.embs[-1].weight, dim=1))

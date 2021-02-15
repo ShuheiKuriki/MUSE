@@ -31,6 +31,9 @@ parser.add_argument("--exp_name", type=str, default="debug", help="Experiment na
 parser.add_argument("--exp_id", type=str, default="", help="Experiment ID")
 parser.add_argument("--device", type=str, default='cuda:0', help="select device")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
+parser.add_argument("--adv_eval", type=str, default="no_target", help="evaluation type during adversarial training (no / only_target / no_target / all)")
+# parser.add_argument("--ref_eval", type=str, default="no_target", help="evaluation type during refinement (no / only_target / no_target / all)")
+parser.add_argument("--last_eval", type=str, default="no_target", help="evaluation type last (no / only_target / no_target / all)")
 parser.add_argument("--test", type=bool, default=False, help="test or not")
 # data
 parser.add_argument("--langs", type=str, nargs='+', default=['en', 'random'], help="languages")
@@ -49,23 +52,23 @@ parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator lay
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
 parser.add_argument("--dis_dropout", type=float, default=0., help="Discriminator dropout")
 parser.add_argument("--dis_input_dropout", type=float, default=0.1, help="Discriminator input dropout")
-parser.add_argument("--dis_sampling", type=float, default=1, help="probality of learning discriminator")
+parser.add_argument("--dis_sampling", type=float, default=2, help="probality of learning discriminator")
 parser.add_argument("--dis_most_frequent", type=int, default=75000, help="Select embeddings of the k most frequent words for discrimination (0 to disable)")
 parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator smooth predictions")
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
-parser.add_argument("--n_epochs", type=int, default=10, help="Number of epochs")
+parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
 parser.add_argument("--emb_optimizer", type=str, default="adam", help="Embedding optimizer")
 parser.add_argument("--dis_optimizer", type=str, default="sgd,lr=0.1", help="Discriminator optimizer")
 parser.add_argument("--emb_lr", type=float, default=1., help="rate for learning embeddings")
-parser.add_argument("--entropy_coef", type=float, default=1, help="loss entropy term coefficient")
 parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
+# parser.add_argument("--adv_tgt", type=int, default=1, help="Number of learning tgt during adv")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 # dictionary creation parameters (for refinement)
@@ -76,7 +79,7 @@ parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold c
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
+parser.add_argument("--metric_size", type=int, default=75000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -127,7 +130,7 @@ for n_epoch in range(params.n_epochs):
             for i in range(int(params.dis_sampling)): trainer.dis_step(stats)
 
         # mapping training (discriminator fooling)
-        n_words_proc += trainer.gen_step(mode='emb')
+        n_words_proc += trainer.gen_step()
 
         # log stats
         if n_iter % 500 == 0:
@@ -145,7 +148,7 @@ for n_epoch in range(params.n_epochs):
 
     # embeddings / discriminator evaluation
     to_log = OrderedDict({'n_epoch': n_epoch, 'tgt_norm': tgt_norm.item()})
-    evaluator.all_eval(to_log, '')
+    evaluator.all_eval(to_log, params.adv_eval)
     evaluator.eval_dis(to_log)
 
     # save best model / end of epoch
@@ -153,12 +156,16 @@ for n_epoch in range(params.n_epochs):
     logger.info('End of epoch %i.\n\n', n_epoch)
 
     # update the learning rate (stop if too small)
-    trainer.update_lr(to_log, VALIDATION_METRIC, 'emb')
+    trainer.update_lr(to_log, VALIDATION_METRIC, ['map', 'emb'])
 
 logger.info('The best metric is %.4f, %d epoch, tgt norm is %.4f\n', trainer.best_valid_metric, trainer.best_epoch, trainer.best_tgt_norm)
 
-# export embeddings
-# if params.export:
-    # trainer.reload_best()
-    # trainer.export()
+to_log = OrderedDict()
+trainer.reload_best()
+to_log = OrderedDict({'best_epoch': trainer.best_epoch, 'tgt_norm': trainer.best_tgt_norm})
+logger.info('\n')
+logger.info('----> FINAL RESULTS <----\n')
+evaluator.all_eval(to_log, params.last_eval)
+# evaluator.eval_dis(to_log)
+logger.info("__log__:%s\n", json.dumps(to_log))
 logger.info('end of the examination')

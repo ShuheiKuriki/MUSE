@@ -183,7 +183,7 @@ class Evaluator:
             _params.dico_method = dico_method
             _params.dico_build = dico_build
             _params.dico_threshold = 0
-            _params.dico_max_rank = 10000
+            _params.dico_max_rank = self.params.metric_size
             _params.dico_min_size = 0
             _params.dico_max_size = dico_max_size
             s2t_candidates = get_candidates(src_emb, tgt_emb, _params)

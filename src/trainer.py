@@ -90,7 +90,7 @@ class Trainer():
         # select random word IDs
         bs = self.params.batch_size
         mf = self.params.dis_most_frequent
-        rv = self.params.univ_vocab
+        uv = self.params.univ_vocab
         langnum = self.langnum
         assert mf <= min(map(len, self.vocabs[:-1]))
 
@@ -98,15 +98,15 @@ class Trainer():
         if self.params.test:
             src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
             tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
-        elif rv > 0 and (i == langnum-1 or j == langnum-1):
-            src_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
-            tgt_ids = torch.LongTensor(bs).random_(rv).to(self.params.device)
+        elif uv > 0 and (i == langnum-1 or j == langnum-1):
+            src_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
+            tgt_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
         else:
             src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
             tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
-        if mode != 'emb':
+        if mode == 'dis':
             src_emb = self.embs[i](src_ids).detach()
             tgt_emb = self.embs[j](tgt_ids).detach()
         else:
@@ -132,7 +132,7 @@ class Trainer():
 
         return x, y
 
-    def get_refine_xy(self, i, j, mode='map'):
+    def get_refine_xy(self, i, j):
         """
         Get input batch / output target for MPSR.
         """
@@ -145,14 +145,8 @@ class Trainer():
         tgt_ids = dico[:, 1].to(self.params.device)
 
         # get word embeddings
-        if mode == 'map':
-            src_emb = self.embs[i](src_ids).detach()
-            y = self.embs[j](tgt_ids).detach()
-        elif mode == 'emb':
-            src_emb = self.embs[i](src_ids)
-            y = self.embs[j](tgt_ids)
-
-        x = self.mapping(src_emb, i, j)
+        x = self.mapping(self.embs[i](src_ids), i, j)
+        y = self.embs[j](tgt_ids)
 
         return x, y
 
@@ -167,8 +161,7 @@ class Trainer():
         # for each target language
         for j in range(self.langnum):
             # random select a source language
-            i = random.choice(list(range(self.langnum)))
-
+            i = random.randint(0, self.langnum-1)
             x, y = self.get_dis_xy(i, j, mode='dis')
             preds = self.discriminator(x.detach(), j)
             loss += F.binary_cross_entropy(preds, y)
@@ -196,28 +189,22 @@ class Trainer():
             logger.info(self.discriminator.models[0][1].weight[0][:10])
             logger.info(self.discriminator.models[1][1].weight[0][:10])
 
-    def gen_step(self, mode='map'):
+    def gen_step(self):
         """
         Fooling discriminator training step.
         """
         self.discriminator.eval()
 
         # loss
-        loss = 0
-        if mode == 'map':
-            # for each source language
-            for i in range(self.langnum):
-                # randomly select a target language
-                j = random.choice(list(range(self.langnum)))
-                x, y = self.get_dis_xy(i, j, mode='map')
-                preds = self.discriminator(x, j)
-                loss += F.binary_cross_entropy(preds, 1-y)
-        elif mode == 'emb':
-            # randomly select a source language
-            i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_dis_xy(i, self.langnum-1, mode='emb')
-            preds = self.discriminator(x, self.langnum-1)
+        loss = words = 0
+        # for each source language
+        for i in range(self.langnum):
+            # randomly select a target language
+            j = random.randint(0, self.langnum-1)
+            x, y = self.get_dis_xy(i, j, mode='gen')
+            preds = self.discriminator(x, j)
             loss += F.binary_cross_entropy(preds, 1-y)
+            words += 2 * self.params.batch_size
 
         # check NaN
         if (loss != loss).detach().any():
@@ -225,44 +212,37 @@ class Trainer():
             sys.exit()
 
         # optim
-        if mode == 'map':
-            self.map_optimizer.zero_grad()
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
-            self.map_optimizer.step()
-            self.mapping.orthogonalize()
-        elif mode == 'emb':
-            self.emb_optimizer.zero_grad()
-            loss.backward()
+        self.map_optimizer.zero_grad()
+        if self.params.learnable: self.emb_optimizer.zero_grad()
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.mapping.parameters(), self.params.clip_grad)
+        self.map_optimizer.step()
+        if self.params.learnable:
             # torch.nn.utils.clip_grad_norm_(self.embedding.parameters(), self.params.clip_grad)
             self.emb_optimizer.step()
+        self.mapping.orthogonalize()
 
         if self.params.test:
-            logger.info('after_%s', mode)
+            logger.info('after_gen')
             # print(torch.norm(self.discriminator.layers[1].weight))
             logger.info(torch.norm(self.discriminator.models[0][1].weight[0]))
             logger.info(torch.norm(self.discriminator.models[1][1].weight[0]))
 
-        return self.langnum * self.params.batch_size
+        return words
 
-    def refine_step(self, stats, mode='map'):
+    def refine_step(self, stats):
         """mpsr step"""
-        loss = 0
-        if mode == 'map':
-            # for each source language
-            for i in range(self.langnum):
-                # randomly select a target language
-                j = random.choice(list(range(self.langnum)))
-                x, y = self.get_refine_xy(i, j, mode='map')
-                loss += F.mse_loss(x, y)
-        elif mode == 'emb':
-            # randomly select a target language
-            i = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(i, self.langnum-1, mode='emb')
+        loss = words = 0
+        for i in range(self.langnum-1):
+            j = random.randint(0, self.langnum-2)
+            x, y = self.get_refine_xy(i, j)
             loss += F.mse_loss(x, y)
-            j = random.choice(list(range(self.langnum-1)))
-            x, y = self.get_refine_xy(self.langnum-1, j, mode='emb')
+            words += 2 * self.params.batch_size
+        for _ in range(self.params.ref_tgt):
+            j = random.randint(0, self.langnum-2)
+            x, y = self.get_refine_xy(self.langnum-1, j)
             loss += F.mse_loss(x, y)
+            words += 2 * self.params.batch_size
         # check NaN
         if (loss != loss).any():
             logger.error("NaN detected (fool discriminator)")
@@ -270,19 +250,14 @@ class Trainer():
 
         stats['REFINE_COSTS'].append(loss.item())
         # optim
-        if mode == 'map':
-            self.ref_optimizer.zero_grad()
-            loss.backward()
-            self.ref_optimizer.step()
-            self.mapping.orthogonalize()
-            return self.langnum * self.params.batch_size
-        if mode == 'emb':
-            self.emb_ref_optimizer.zero_grad()
-            loss.backward()
-            self.emb_ref_optimizer.step()
-            return 2 * self.params.batch_size
-        return 0
+        self.ref_optimizer.zero_grad()
+        if self.params.learnable: self.emb_ref_optimizer.zero_grad()
+        loss.backward()
+        self.ref_optimizer.step()
+        if self.params.learnable: self.emb_ref_optimizer.step()
+        self.mapping.orthogonalize()
 
+        return words
 
     def load_training_dico(self, dico_train):
         """
@@ -318,16 +293,28 @@ class Trainer():
         embs = [self.mapping(self.embs[i].weight, i).detach() for i in range(self.langnum)]
         embs = [embs[i] / embs[i].norm(2, 1, keepdim=True).expand_as(embs[i]) for i in range(self.langnum)]
 
-        for i in range(self.langnum):
-            for j in range(self.langnum):
+        self.params.dico_max_rank = 15000
+        idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
+        for i in range(self.langnum-1):
+            for j in range(self.langnum-1):
+                if i != j: logger.info('%s %s', self.params.langs[i], self.params.langs[j])
                 if i < j:
                     logger.info("Building the train dictionary between %s and %s", self.params.langs[i], self.params.langs[j])
                     self.dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
                 elif i > j:
                     self.dicos[i][j] = self.dicos[j][i][:, [1, 0]]
                 else:
-                    idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
                     self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
+        if self.params.langs[-1] == 'random':
+            self.params.dico_max_rank = self.params.univ_vocab
+        for i in range(self.langnum-1):
+            logger.info('%s %s', self.params.langs[i], self.params.langs[-1])
+            self.dicos[i][-1] = build_dictionary(embs[i], embs[-1], self.params)
+        for j in range(self.langnum-1):
+            logger.info('%s %s', self.params.langs[-1], self.params.langs[j])
+            self.dicos[-1][j] = self.dicos[j][-1][:, [1, 0]]
+        idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
+        self.dicos[-1][-1] = torch.cat([idx, idx], dim=1).to(self.params.device)
 
     def procrustes(self):
         """
@@ -342,41 +329,39 @@ class Trainer():
             U, S, V_t = scipy.linalg.svd(M, full_matrices=True)
             W.copy_(torch.from_numpy(U.dot(V_t)).type_as(W))
 
-    def update_lr(self, to_log, metric, mode='map'):
+    def update_lr(self, to_log, metric, modes='map'):
         """
         Update learning rate when using SGD.
         """
-        if mode == 'map':
-            optimizer = self.map_optimizer
-        elif mode == 'emb':
-            optimizer = self.emb_optimizer
-        elif mode == 'ref':
-            optimizer = self.ref_optimizer
-        elif mode == 'emb_ref':
-            optimizer = self.emb_ref_optimizer
+        optimizers = []
+        if 'map' in modes and self.params.map_optimizer[:3] == 'sgd':
+            optimizers.append(('map', self.map_optimizer))
+        if 'emb' in modes and self.params.emb_optimizer[:3] == 'sgd':
+            optimizers.append(('emb', self.emb_optimizer))
+        if 'ref' in modes and self.params.ref_optimizer[:3] == 'sgd':
+            optimizers.append(('ref', self.ref_optimizer))
+        if 'emb_ref' in modes and self.params.emb_ref_optimizer[:3] == 'sgd':
+            optimizers.append(('emb_ref', self.emb_ref_optimizer))
 
-        if mode == 'map' and self.params.map_optimizer[:3] != 'sgd': return
-        if mode == 'emb' and self.params.emb_optimizer[:3] != 'sgd': return
-        if mode == 'ref' and self.params.ref_optimizer[:3] != 'sgd': return
-        if mode == 'emb_ref' and self.params.emb_ref_optimizer[:3] != 'sgd': return
-
-        old_lr = optimizer.param_groups[0]['lr']
-        new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
-        if new_lr < old_lr:
-            logger.info("Decreasing learning rate: %s %.8f -> %.8f ", mode, old_lr, new_lr)
-            optimizer.param_groups[0]['lr'] = new_lr
-        if self.params.lr_shrink < 1 and to_log[metric] >= -1e7:
-            if to_log[metric] < self.prev_metric:
-                logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
-                # decrease the learning rate, only if this is the
-                # second time the validation metric decreases
-                old_lr = optimizer.param_groups[0]['lr']
-                optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
-                logger.info("Shrinking the learning rate: %s %.5f -> %.5f", mode, old_lr, old_lr*self.params.lr_shrink)
-                self.decrease_lr = True
-            else:
-                logger.info("The validation metric is getting better")
-            self.prev_metric = to_log[metric]
+        if to_log[metric] < self.prev_metric:
+            update = True
+            logger.info("Validation metric is smaller than the previous one: %.5f vs %.5f", to_log[metric], self.prev_metric)
+        else:
+            update = False
+            logger.info("The validation metric is getting better %.5f → %.5f", self.prev_metric, to_log[metric])
+        self.prev_metric = to_log[metric]
+        for mode, optimizer in optimizers:
+            old_lr = optimizer.param_groups[0]['lr']
+            new_lr = max(self.params.min_lr, old_lr * self.params.lr_decay)
+            if new_lr < old_lr:
+                logger.info("Decreasing learning rate: %s %.8f -> %.8f ", mode, old_lr, new_lr)
+                optimizer.param_groups[0]['lr'] = new_lr
+            if self.params.lr_shrink == 1 or not update: continue
+            # decrease the learning rate, only if this is the
+            # second time the validation metric decreases
+            old_lr = optimizer.param_groups[0]['lr']
+            optimizer.param_groups[0]['lr'] *= self.params.lr_shrink
+            logger.info("Shrinking the learning rate: %s %.5f -> %.5f", mode, old_lr, old_lr*self.params.lr_shrink)
 
     def save_best(self, to_log, metric):
         """
