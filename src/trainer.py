@@ -98,12 +98,15 @@ class Trainer():
         if self.params.test:
             src_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
             tgt_ids = torch.arange(0, bs, dtype=torch.int64).to(self.params.device)
-        elif uv > 0 and (i == langnum-1 or j == langnum-1):
-            src_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
-            tgt_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
         else:
-            src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
-            tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
+            if uv > 0 and i == langnum-1:
+                src_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
+            else:
+                src_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
+            if uv > 0 and j == langnum-1:
+                tgt_ids = torch.LongTensor(bs).random_(uv).to(self.params.device)
+            else:
+                tgt_ids = torch.LongTensor(bs).random_(mf).to(self.params.device)
 
         # get word embeddings
         if mode == 'dis':
