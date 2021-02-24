@@ -8,10 +8,10 @@ get word translation result for learned universal embeddings
 # LICENSE file in the root directory of this source tree.
 #
 
-# python get_csls.py --langs en_ja_de_es_fr_it_pt_random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike
-# python get_csls.py --langs en_ja_random --exp_name analysis --load_path dumped/en_ja_enlike/new_lr0_adam_p.7_45.4_0.82 --exp_id en_ja_enlike_10000
-# python get_csls.py --langs en_de_es_fr_it_pt_random --exp_name analysis --load_path dumped/six_w_enlike/new_lr0_adam_p1_77.3_0.80 --exp_id six_w_enlike_check
-# python get_csls.py --langs en_ja_de_es_fr_it_pt_random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike_200000
+# python get_csls.py --langs en ja de es fr it pt random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike
+# python get_csls.py --langs en ja random --exp_name analysis --load_path dumped/en_ja_enlike/new_lr0_adam_p.7_45.4_0.82 --exp_id en_ja_enlike_10000
+# python get_csls.py --langs en de es fr it pt random --exp_name analysis --load_path dumped/six_w_enlike/new_lr0_adam_p1_77.3_0.80 --exp_id six_w_enlike_check
+# python get_csls.py --langs en ja de es fr it pt random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike_200000
 import os
 import json
 import argparse
@@ -36,7 +36,7 @@ parser.add_argument("--cuda", type=bool_flag, default=True, help="Run on GPU")
 parser.add_argument("--export", type=str, default="txt", help="Export embeddings after training (txt / pth)")
 
 # data
-parser.add_argument("--langs", type=str, default='es_en', help="Source language")
+parser.add_argument("--langs", type=str, nargs='+', default=['de', 'es', 'fr', 'it', 'pt', 'en', 'random'], help="languages")
 parser.add_argument("--emb_dim", type=int, default=300, help="Embedding dimension")
 parser.add_argument("--max_vocab", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
 parser.add_argument("--n_tgt", type=int, default=200000, help="Maximum vocabulary size (-1 to disable)")
@@ -48,7 +48,6 @@ params = parser.parse_args()
 # check parameters
 assert not params.cuda or torch.cuda.is_available()
 
-params.langs = params.langs.split('_')
 params.langnum = len(params.langs)
 params.embpaths = []
 for i in range(params.langnum):
@@ -63,7 +62,7 @@ embs[-1] = torch.load(params.load_path+'/vectors-random.pth')
 
 maps = [0]*(params.langnum-1)
 for i in range(params.langnum-1):
-    maps[i] = torch.from_numpy(torch.load(params.load_path+'/best_mapping{}.pth'.format(i+1)))
+    maps[i] = torch.load(params.load_path+'/best_mapping{}.pth'.format(i+1))
     embs[i] = embs[i].mm(maps[i].t())[:params.n_tgt]
 
 n_src = 128
