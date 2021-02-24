@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 # sample excutions(normal)
+# python unsupervised.py --exp_name fives/five --exp_id mat_fr --langs de es it pt fr --device cuda:0
 # python unsupervised.py --exp_name fives/five+en --exp_id en_mat --langs de es it pt fr en --device cuda:0 --last_eval no_target
 # python unsupervised.py --exp_name sixes --exp_id six_langs_mat --langs de es it fr pt en --device cuda:0
 # python unsupervised.py --exp_name sevens --exp_id seven_langs_mat --langs ja de es it fr pt en --device cuda:0
@@ -74,10 +75,11 @@ parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate 
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
 # training refinement
-parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement epochs (0 to disable the refinement procedure)")
+parser.add_argument("--n_refinement", type=int, default=10, help="Number of refinement epochs (0 to disable the refinement procedure)")
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="refine optimizer")
 parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb optimizer when refine")
+parser.add_argument("--ref_tgt", type=int, default=1, help="Number of learning tgt during ref")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -86,7 +88,7 @@ parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold c
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
 parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=15000, help="size for csls metric")
+parser.add_argument("--metric_size", type=int, default=75000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 

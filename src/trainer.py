@@ -237,12 +237,18 @@ class Trainer():
         """mpsr step"""
         loss = words = 0
         for i in range(self.langnum-1):
-            j = random.randint(0, self.langnum-2)
+            if self.params.langs[-1] == 'random':
+                j = random.randint(0, self.langnum-2)
+            else:
+                j = random.randint(0, self.langnum-1)
             x, y = self.get_refine_xy(i, j)
             loss += F.mse_loss(x, y)
             words += 2 * self.params.batch_size
         for _ in range(self.params.ref_tgt):
-            j = random.randint(0, self.langnum-2)
+            if self.params.langs[-1] == 'random':
+                j = random.randint(0, self.langnum-2)
+            else:
+                j = random.randint(0, self.langnum-1)
             x, y = self.get_refine_xy(self.langnum-1, j)
             loss += F.mse_loss(x, y)
             words += 2 * self.params.batch_size
