@@ -8,10 +8,10 @@ get word translation result for learned universal embeddings
 # LICENSE file in the root directory of this source tree.
 #
 
-# python get_csls.py --langs en ja de es fr it pt random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike
-# python get_csls.py --langs en ja random --exp_name analysis --load_path dumped/en_ja_enlike/new_lr0_adam_p.7_45.4_0.82 --exp_id en_ja_enlike_10000
-# python get_csls.py --langs en de es fr it pt random --exp_name analysis --load_path dumped/six_w_enlike/new_lr0_adam_p1_77.3_0.80 --exp_id six_w_enlike_check
-# python get_csls.py --langs en ja de es fr it pt random --exp_name analysis --load_path dumped/seven_w_enlike/new_lr0_adam_p.7_75.2_0.79 --exp_id seven_w_enlike_200000
+# python get_neighbor.py --langs ja de es it fr pt en random --exp_name analysis --load_path dumped/sevens/uniform/mat_vocab30K_ref3_66.6 --exp_id seven_30K_ref3
+# python get_neighbor.py --langs en ja random --exp_name analysis --load_path "dumped/twos/en_ja/uniform/mat_s2t_5K_ref1_54.1_37.3" --exp_id en_ja_5K_s2t_ref1
+# python get_neighbor.py --langs de es random --exp_name analysis --load_path "dumped/twos/de_es/uniform/mat_v5K_67_67.1" --exp_id de_es_5K_ref2
+
 import os
 import json
 import argparse

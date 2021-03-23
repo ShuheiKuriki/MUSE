@@ -176,8 +176,8 @@ class Evaluator:
 
         # build dictionary
         for dico_method in ['csls_knn_10']:
-            dico_build = 'S2T'
-            dico_max_size = self.params.metric_size
+            dico_build = self.params.dico_eval_build
+            dico_max_size = self.params.dico_max_size
             # temp params / dictionary generation
             _params = deepcopy(self.params)
             _params.dico_method = dico_method
@@ -196,10 +196,12 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("%s-%s Mean cosine (%s method, %s build, %i max size): %.5f", self.params.langs[i], self.params.langs[j], dico_method, _params.dico_build, dico_max_size, mean_cosine)
-            if 'mean_cosine-{}-{}-{}'.format(dico_method, _params.dico_build, dico_max_size) in to_log:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)].append(mean_cosine)
+            metric = f'mean_cosine-{dico_method}-{_params.dico_build}-{dico_max_size}'
+            if self.params.last_eval == 'no_target' and j == self.langnum-1: metric += '-target'
+            if metric in to_log:
+                to_log[metric].append(mean_cosine)
             else:
-                to_log['mean_cosine-%s-%s-%i' % (dico_method, _params.dico_build, dico_max_size)] = [mean_cosine]
+                to_log[metric] = [mean_cosine]
 
     def all_eval(self, to_log, eval_type='no_target'):
         """
@@ -245,9 +247,14 @@ class Evaluator:
         dis_accu = ((fake_accu * len(fake_preds) + real_accu * len(real_preds)) / (len(real_preds) + len(fake_preds)))
         logger.info("%s Discriminator real / fake / global accuracy: %.5f / %.5f / %.5f", lang, real_accu, fake_accu, dis_accu)
 
-        to_log[f'{lang}_dis_accu'] = dis_accu
-        to_log[f'{lang}_dis_fake_pred'] = fake_pred
-        to_log[f'{lang}_dis_real_pred'] = real_pred
+        if 'dis_accu' in to_log:
+            to_log['dis_accu'].append(dis_accu)
+            to_log['dis_fake_pred'].append(fake_pred)
+            to_log['dis_real_pred'].append(real_pred)
+        else:
+            to_log['dis_accu'] = [dis_accu]
+            to_log['dis_fake_pred'] = [fake_pred]
+            to_log['dis_real_pred'] = [real_pred]
 
         return dis_accu
 
@@ -289,5 +296,6 @@ class Evaluator:
 
         avg_dis_accu = np.mean(dis_accus)
         to_log['dis_accu'] = avg_dis_accu
-        # to_log['dis_src_pred'] = pred
-        # to_log['dis_tgt_pred'] = pred
+
+        for k in to_log:
+            if isinstance(to_log[k], list): to_log[k] = sum(to_log[k])/len(to_log[k])

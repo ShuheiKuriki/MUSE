@@ -16,6 +16,7 @@ import random
 import torch
 # from torch.autograd import Variable
 from torch.nn import functional as F
+from copy import deepcopy
 import numpy as np
 
 from .utils import get_optimizer, load_embeddings, normalize_embeddings, export_embeddings
@@ -302,28 +303,28 @@ class Trainer():
         embs = [self.mapping(self.embs[i].weight, i).detach() for i in range(self.langnum)]
         embs = [embs[i] / embs[i].norm(2, 1, keepdim=True).expand_as(embs[i]) for i in range(self.langnum)]
 
-        self.params.dico_max_rank = 15000
-        idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
+        _params = deepcopy(self.params)
+        idx = torch.arange(_params.dico_max_rank).long().view(_params.dico_max_rank, 1)
         for i in range(self.langnum-1):
             for j in range(self.langnum-1):
-                if i != j: logger.info('%s %s', self.params.langs[i], self.params.langs[j])
+                if i != j: logger.info('%s %s', _params.langs[i], _params.langs[j])
                 if i < j:
-                    logger.info("Building the train dictionary between %s and %s", self.params.langs[i], self.params.langs[j])
-                    self.dicos[i][j] = build_dictionary(embs[i], embs[j], self.params)
+                    logger.info("Building the train dictionary between %s and %s", _params.langs[i], _params.langs[j])
+                    self.dicos[i][j] = build_dictionary(embs[i], embs[j], _params)
                 elif i > j:
                     self.dicos[i][j] = self.dicos[j][i][:, [1, 0]]
                 else:
-                    self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
-        if self.params.langs[-1] == 'random':
-            self.params.dico_max_rank = self.params.univ_vocab
+                    self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(_params.device)
+        if _params.langs[-1] == 'random':
+            _params.dico_max_rank = max(15000, _params.univ_vocab)
         for i in range(self.langnum-1):
-            logger.info('%s %s', self.params.langs[i], self.params.langs[-1])
-            self.dicos[i][-1] = build_dictionary(embs[i], embs[-1], self.params)
+            logger.info('%s %s', _params.langs[i], _params.langs[-1])
+            self.dicos[i][-1] = build_dictionary(embs[i], embs[-1], _params)
         for j in range(self.langnum-1):
-            logger.info('%s %s', self.params.langs[-1], self.params.langs[j])
+            logger.info('%s %s', _params.langs[-1], _params.langs[j])
             self.dicos[-1][j] = self.dicos[j][-1][:, [1, 0]]
-        idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
-        self.dicos[-1][-1] = torch.cat([idx, idx], dim=1).to(self.params.device)
+        idx = torch.arange(_params.dico_max_rank).long().view(_params.dico_max_rank, 1)
+        self.dicos[-1][-1] = torch.cat([idx, idx], dim=1).to(_params.device)
 
     def procrustes(self):
         """

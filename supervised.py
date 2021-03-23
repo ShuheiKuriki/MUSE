@@ -48,11 +48,13 @@ parser.add_argument("--n_refinement", type=int, default=5, help="Number of refin
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="Multilingual Pseudo-Supervised Refinement optimizer")
 parser.add_argument("--ref_n_steps", type=int, default=10000, help="Number of optimization steps for MPSR")
+parser.add_argument("--ref_tgt", type=int, default=1, help="Number of learning tgt during ref")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_train", type=str, default="default", help="Path to training dictionary (default: use identical character strings)")
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
 parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_eval_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=10000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
@@ -100,7 +102,7 @@ for n_epoch in range(params.n_refinement+1):
 
     # build a dictionary from aligned embeddings (unless
     # it is the first iteration and we use the init one)
-    # if n_epoch > 0 or not hasattr(trainer, 'dicos'): trainer.build_dictionary()
+    if n_epoch > 0 or not hasattr(trainer, 'dicos'): trainer.build_dictionary()
 
     # optimize MPSR
     tic = time.time()

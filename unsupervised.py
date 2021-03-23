@@ -84,11 +84,12 @@ parser.add_argument("--ref_tgt", type=int, default=1, help="Number of learning t
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
 parser.add_argument("--dico_build", type=str, default='S2T&T2S', help="S2T,T2S,S2T|T2S,S2T&T2S")
+parser.add_argument("--dico_eval_build", type=str, default='S2T', help="S2T,T2S,S2T|T2S,S2T&T2S")
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
-parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=75000, help="size for csls metric")
+parser.add_argument("--dico_max_size", type=int, default=10000, help="Maximum generated dictionary size (0 to disable)")
+parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -102,10 +103,10 @@ assert 0 <= params.dis_dropout < 1
 assert 0 <= params.dis_input_dropout < 1
 assert 0 <= params.dis_smooth < 0.5
 assert 0 < params.lr_shrink <= 1
-assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
+assert params.dico_eval in ['default', 'train'] or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.metric_size)
+VALIDATION_METRIC = f'mean_cosine-csls_knn_10-{params.dico_eval_build}-{params.dico_max_size}-target'
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
