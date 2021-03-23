@@ -1,15 +1,18 @@
-## 2/17現在のmat_mpsrブランチの状況
+## 3/23現在のmat_mpsrブランチの状況
 現在以下の実行ファイルは正常に動くことを確認しています
 * supervised.py : 辞書を利用する教師あり学習，教師ありでもmpsrのプロセスが導入されている．
 * unsupervised.py : 普遍空間を用いない通常の多言語学習と，英語をそのまま初期値とした普遍空間の学習を行うことができる
 * learn_univ.py : 普遍空間をゼロから学習する
-* learn_univ_w_init_emb.py : 普遍空間の初期値を別ファイルから取り込み，普遍空間の学習を行う．初期値を事前に学習しておかないといけない
-* learn_init.py : 普遍空間の初期値を学習する。optimizerの選択が重要
+* get_csls.py : 普遍空間の各ベクトルの近傍単語を取得する
 
-普遍空間を学習する方法
-* uniform : 全単語をノルム0.01の正規分布で初期化して学習
-* en-variable : unsupervised.pyを実行(オプションの設定はファイルの冒頭を参照)
-* en-like : learn_init.py → learn_univ_w_init_emb.py
+```bash
+python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
+python supervised.py --exp_name sixes/pivot-en --exp_id mpsr --langs de es fr it pt en --device cuda:0
+python unsupervised.py --exp_name twos/en-ja --exp_id mat-mpsr --langs en ja --device cuda:0
+python unsupervised.py --exp_name sixes/pivot-en --exp_id mat-mpsr --langs de es fr it pt en --device cuda:0
+python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja random --device cuda:0
+python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0
+```
 
 ## MUSE: Multilingual Unsupervised and Supervised Embeddings
 ![Model](./outline_all.png)

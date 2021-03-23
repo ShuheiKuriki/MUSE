@@ -7,7 +7,8 @@ Supervised
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python supervised.py --exp_name twos/supervised --exp_id de_es --langs de es --device cuda:0
+# python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
+# python supervised.py --exp_name sixes/pivot-en --exp_id mpsr --langs de es fr it pt en --device cuda:0
 
 import os
 import json

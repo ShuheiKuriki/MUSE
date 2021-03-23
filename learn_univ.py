@@ -5,10 +5,10 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python learn_univ.py --exp_name twos/de_es/uniform --exp_id mat --langs de es random --device cuda:0
-# python learn_univ.py --exp_name fives/uniform --exp_id mat --langs de es fr it pt random --device cuda:0
-# python learn_univ.py --exp_name sixes/uniform --exp_id mat --langs de en es fr it pt random --device cuda:0
-# python learn_univ.py --exp_name sevens/uniform --exp_id mat --langs de en es fr it ja pt random --device cuda:0
+# python learn_univ.py --exp_name twos/de_es/univ --exp_id mat --langs de es random --device cuda:0
+# python learn_univ.py --exp_name fives/univ --exp_id mat --langs de es fr it pt random --device cuda:0
+# python learn_univ.py --exp_name sixes/univ --exp_id mat --langs de en es fr it pt random --device cuda:0
+# python learn_univ.py --exp_name sevens/univ --exp_id mat --langs de en es fr it ja pt random --device cuda:0
 
 import os
 import time
