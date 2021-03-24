@@ -14,8 +14,8 @@ python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --d
 python supervised.py --exp_name sixes/pivot-en --exp_id mpsr --langs de es fr it pt en --device cuda:0
 python unsupervised.py --exp_name twos/en-ja --exp_id mat-mpsr --langs en ja --device cuda:0
 python unsupervised.py --exp_name sixes/pivot-en --exp_id mat-mpsr --langs de es fr it pt en --device cuda:0
-python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja random --device cuda:0 --ref_tgt 3 --univ_vocab 3
-python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 3
+python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja random --device cuda:0 --ref_tgt 3 --univ_vocab 30000
+python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 30000
 ```
 
 
