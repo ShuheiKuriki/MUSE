@@ -5,14 +5,20 @@
 * learn_univ.py : 普遍空間をゼロから学習する
 * get_csls.py : 普遍空間の各ベクトルの近傍単語を取得する
 
+learn_univ.pyにおいて重要なオプション
+* ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数
+* univ_vocab : 普遍空間の単語数。30,000~50,000が適正と思われる．多すぎると収束が遅くなる．
+
 ```bash
 python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
 python supervised.py --exp_name sixes/pivot-en --exp_id mpsr --langs de es fr it pt en --device cuda:0
 python unsupervised.py --exp_name twos/en-ja --exp_id mat-mpsr --langs en ja --device cuda:0
 python unsupervised.py --exp_name sixes/pivot-en --exp_id mat-mpsr --langs de es fr it pt en --device cuda:0
-python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja random --device cuda:0
-python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0
+python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja random --device cuda:0 --ref_tgt 3 --univ_vocab 3
+python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 3
 ```
+
+
 
 ## MUSE: Multilingual Unsupervised and Supervised Embeddings
 ![Model](./outline_all.png)

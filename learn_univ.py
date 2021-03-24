@@ -47,7 +47,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 # random embedding
 parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
 parser.add_argument("--emb_norm", type=float, default=0.01, help="norm of embeddings")
-parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=50000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -69,13 +69,12 @@ parser.add_argument("--emb_lr", type=float, default=0.3, help="learning rate for
 parser.add_argument("--lr_decay", type=float, default=0.95, help="Learning rate decay (SGD only)")
 parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate (SGD only)")
 parser.add_argument("--lr_shrink", type=float, default=0.5, help="Shrink the learning rate if the validation metric decreases (1 to disable)")
-# parser.add_argument("--adv_tgt", type=int, default=1, help="Number of learning tgt during adv")
 # training refinement
 parser.add_argument("--n_refinement", type=int, default=10, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="map optimizer when refine")
 parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb optimizer when refine")
-parser.add_argument("--ref_tgt", type=int, default=2, help="Number of learning tgt during ref")
+parser.add_argument("--ref_tgt", type=int, default=3, help="Number of learning tgt during ref")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
