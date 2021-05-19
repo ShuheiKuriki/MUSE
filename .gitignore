@@ -1,12 +1,15 @@
 # MUSE data and result folders
 
-data/
 dumped/
 vectors/
 *.vec
 joint_align/
 *.txt
-*.sh
+learn*.sh
+data/crosslingual
+data/emb_norms
+data/monolingual
+data/tools
 
 # Created by https://www.gitignore.io/api/vim,python
 
