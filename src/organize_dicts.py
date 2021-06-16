@@ -5,7 +5,10 @@ import os
 fr = '../embeddings/filtered_dictionaries'
 fr2 = '../embeddings/bridged_dictionaries'
 to = 'data/crosslingual/dictionaries'
+# https://ja.wikipedia.org/wiki/ISO_639-1%E3%82%B3%E3%83%BC%E3%83%89%E4%B8%80%E8%A6%A7
+# ISO639-2/T
 langs = ['hin', 'kor', 'rus', 'fin', 'jpn', 'zho', 'tha', 'swe', 'nld', 'ara', 'ind', 'tur']
+# ISO639-1
 langs2 = ['hi', 'ko', 'ru', 'fi', 'ja', 'zh', 'th', 'sv', 'nl', 'ar', 'id', 'tr']
 for l11, l12 in zip(langs, langs2):
     for l21, l22 in zip(langs, langs2):

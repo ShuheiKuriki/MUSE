@@ -1,13 +1,13 @@
-## 3/23現在のmat_mpsrブランチの状況
-現在以下の実行ファイルは正常に動くことを確認しています
-* supervised.py : 辞書を利用する教師あり学習，教師ありでもmpsrのプロセスが導入されている．
-* unsupervised.py : 普遍空間を用いない通常の多言語学習と，英語をそのまま初期値とした普遍空間の学習を行うことができる
-* learn_univ.py : 普遍空間をゼロから学習する
-* get_csls.py : 普遍空間の各ベクトルの近傍単語を取得する
+## 6/16現在のmat_mpsrブランチの状況
+* supervised.py : 辞書を利用する教師あり学習，教師ありでもmpsrのプロセスが導入されている．既存のものからややアレンジしています。
+* unsupervised.py : 普遍空間を用いない通常のMAT+MPSR
+* learn_univ.py : Universal Concept Embeddingsを用いた多言語学習
+* get_neighbor.py : 普遍空間の各ベクトルの近傍単語を取得する(最近動作確認してない)
+* 
 
 learn_univ.pyにおいて重要なオプション
-* ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数
-* univ_vocab : 普遍空間の単語数。30,000~50,000が適正と思われる．多すぎると収束が遅くなる．
+* ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数 →　言語数//2に固定しました。
+* univ_vocab : 普遍空間の単語数。適正値は言語数に比例するという仮説を立てている。
 
 ```bash
 python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
@@ -18,6 +18,24 @@ python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja 
 python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 30000
 ```
 
+# データセット
+英語を含まない言語ペアで評価を行う場合
+https://github.com/ccsasuke/umwe からデータを持ってきます。
+このリポジトリの1個上の階層に以下をcloneする。
+```
+git clone https://github.com/ccsasuke/umwe.git
+```
+その上で、欲しい言語に合わせて以下のファイルを編集し、実行する。
+```
+python src/organize_dicts.py
+```
+
+# VecMap
+MUSEのデータセットでVecMapを実験できるようにした。
+```
+cd vecmap
+bash vecmap.sh
+```
 
 
 ## MUSE: Multilingual Unsupervised and Supervised Embeddings
