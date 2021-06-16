@@ -8,6 +8,7 @@
 learn_univ.pyにおいて重要なオプション
 * ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数 →　言語数//2に固定しました。
 * univ_vocab : 普遍空間の単語数。適正値は言語数に比例するという仮説を立てている。
+* dico_build : 対応単語ペア集合の作り方を規定、最適化の対象となる単語ペアが変わる。S2T&T2Sが基本的に良いが、文脈ありではどうなるか？
 
 ```bash
 python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
@@ -19,9 +20,9 @@ python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr
 ```
 
 ## データセット
-英語を含まない言語ペアで評価を行う場合
-https://github.com/ccsasuke/umwe からデータを持ってきます。
-このリポジトリの1個上の階層に以下をcloneする。
+英語を含む言語ペアかヨーロッパ言語で評価を行う場合はページ下の英文箇所を参考にデータセットを初期化。
+それ以外の言語ペアで評価を行う場合　https://github.com/ccsasuke/umwe から評価用辞書を持ってきます。
+まず、このリポジトリの1個上の階層に以下をcloneする。
 ```
 git clone https://github.com/ccsasuke/umwe.git
 ```
