@@ -21,7 +21,7 @@ import numpy as np
 
 from .utils import get_optimizer, load_embeddings, normalize_embeddings, export_embeddings
 from .utils import clip_parameters
-from .dico_builder import build_dictionary
+from .dico_builder import get_candidates, build_dictionary
 from .evaluation.word_translation import DIC_EVAL_PATH, load_identical_char_dico, load_dictionary
 
 
@@ -275,7 +275,7 @@ class Trainer():
         """
         for i in range(self.params.langnum):
             for j in range(self.params.langnum):
-                if i == j:
+                if i == j or self.params.langs[i] == self.params.langs[j]:
                     idx = torch.arange(self.params.dico_max_rank).long().view(self.params.dico_max_rank, 1)
                     self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(self.params.device)
                 else:
@@ -307,21 +307,19 @@ class Trainer():
         idx = torch.arange(_params.dico_max_rank).long().view(_params.dico_max_rank, 1)
         for i in range(self.langnum-1):
             for j in range(self.langnum-1):
-                if i != j: logger.info('%s %s', _params.langs[i], _params.langs[j])
                 if i < j:
-                    logger.info("Building the train dictionary between %s and %s", _params.langs[i], _params.langs[j])
+                    logger.info("%s and %s building the train dictionary", _params.langs[i], _params.langs[j])
                     self.dicos[i][j] = build_dictionary(embs[i], embs[j], _params)
                 elif i > j:
                     self.dicos[i][j] = self.dicos[j][i][:, [1, 0]]
                 else:
                     self.dicos[i][j] = torch.cat([idx, idx], dim=1).to(_params.device)
         if _params.langs[-1] == 'random':
-            _params.dico_max_rank = max(15000, _params.univ_vocab)
+            _params.dico_max_rank = max(self.params.dico_max_rank, _params.univ_vocab)
         for i in range(self.langnum-1):
-            logger.info('%s %s', _params.langs[i], _params.langs[-1])
-            self.dicos[i][-1] = build_dictionary(embs[i], embs[-1], _params)
+            logger.info("%s and %s building the train dictionary", _params.langs[i], _params.langs[-1])
+            self.dicos[i][-1] = build_dictionary(embs[i], embs[-1], _params, s2t_candidates=None, t2s_candidates=None)
         for j in range(self.langnum-1):
-            logger.info('%s %s', _params.langs[-1], _params.langs[j])
             self.dicos[-1][j] = self.dicos[j][-1][:, [1, 0]]
         idx = torch.arange(_params.dico_max_rank).long().view(_params.dico_max_rank, 1)
         self.dicos[-1][-1] = torch.cat([idx, idx], dim=1).to(_params.device)

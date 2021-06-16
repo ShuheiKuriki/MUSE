@@ -47,7 +47,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 # random embedding
 parser.add_argument("--emb_init", type=str, default='uniform', help="initialize type of embeddings")
 parser.add_argument("--emb_norm", type=float, default=0.01, help="norm of embeddings")
-parser.add_argument("--univ_vocab", type=int, default=50000, help="Random vocabulary size (0 to disable)")
+parser.add_argument("--univ_vocab", type=int, default=75000, help="Random vocabulary size (0 to disable)")
 # discriminator
 parser.add_argument("--dis_layers", type=int, default=2, help="Discriminator layers")
 parser.add_argument("--dis_hid_dim", type=int, default=2048, help="Discriminator hidden layer dimensions")
@@ -74,7 +74,6 @@ parser.add_argument("--n_refinement", type=int, default=10, help="Number of refi
 parser.add_argument("--ref_steps", type=int, default=30000, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="map optimizer when refine")
 parser.add_argument("--emb_ref_optimizer", type=str, default="adam", help="emb optimizer when refine")
-parser.add_argument("--ref_tgt", type=int, default=3, help="Number of learning tgt during ref")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_eval", type=str, default="default", help="Path to evaluation dictionary")
 parser.add_argument("--dico_method", type=str, default='csls_knn_10', help="Method used for dictionary generation (nn/invsm_beta_30/csls_knn_10)")
@@ -83,7 +82,7 @@ parser.add_argument("--dico_eval_build", type=str, default='S2T', help="S2T,T2S,
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
-parser.add_argument("--dico_max_size", type=int, default=10000, help="Maximum generated dictionary size (0 to disable)")
+parser.add_argument("--dico_max_size", type=int, default=15000, help="Maximum generated dictionary size (0 to disable)")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -101,11 +100,13 @@ assert params.dico_eval == 'default' or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
 params.metric_size = max(10000, params.univ_vocab)
-VALIDATION_METRIC = 'mean_cosine-csls_knn_10-S2T-'+str(params.dico_max_size)+'-target'
+params.dico_max_size = params.univ_vocab
+VALIDATION_METRIC = f'mean_cosine-csls_knn_10-{params.dico_eval_build}-{params.metric_size}-all'
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator
 params.langnum = len(params.langs)
+params.ref_tgt = params.langnum // 2
 params.embpaths = [f'data/wiki.{params.langs[i]}.vec' for i in range(params.langnum)]
 if params.emb_optimizer == 'sgd': params.emb_optimizer = "sgd,lr=" + str(params.emb_lr)
 logger = initialize_exp(params)

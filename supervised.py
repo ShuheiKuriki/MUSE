@@ -7,8 +7,7 @@ Supervised
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-# python supervised.py --exp_name twos/unsup/en-ja --exp_id mpsr --langs en ja --device cuda:0
-# python supervised.py --exp_name sixes/pivot-en --exp_id mpsr --langs de es fr it pt en --device cuda:0
+# python supervised.py --exp_name twos/supervised --exp_id de_es --langs de es --device cuda:0
 
 import os
 import json
@@ -48,7 +47,7 @@ parser.add_argument("--map_beta", type=float, default=0.001, help="Beta for orth
 parser.add_argument("--n_refinement", type=int, default=5, help="Number of refinement iterations (0 to disable the refinement procedure)")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--ref_optimizer", type=str, default="adam", help="Multilingual Pseudo-Supervised Refinement optimizer")
-parser.add_argument("--ref_n_steps", type=int, default=10000, help="Number of optimization steps for MPSR")
+parser.add_argument("--ref_n_steps", type=int, default=30000, help="Number of optimization steps for MPSR")
 parser.add_argument("--ref_tgt", type=int, default=1, help="Number of learning tgt during ref")
 # dictionary creation parameters (for refinement)
 parser.add_argument("--dico_train", type=str, default="default", help="Path to training dictionary (default: use identical character strings)")
@@ -103,7 +102,7 @@ for n_epoch in range(params.n_refinement+1):
 
     # build a dictionary from aligned embeddings (unless
     # it is the first iteration and we use the init one)
-    if n_epoch > 0 or not hasattr(trainer, 'dicos'): trainer.build_dictionary()
+    # if n_epoch > 0 or not hasattr(trainer, 'dicos'): trainer.build_dictionary()
 
     # optimize MPSR
     tic = time.time()

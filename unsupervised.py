@@ -64,7 +64,7 @@ parser.add_argument("--dis_smooth", type=float, default=0.1, help="Discriminator
 parser.add_argument("--clip_grad", type=float, default=1, help="Clip model grads (0 to disable)")
 # training adversarial
 parser.add_argument("--adversarial", type=bool_flag, default=True, help="Use adversarial training")
-parser.add_argument("--n_epochs", type=int, default=5, help="Number of epochs")
+parser.add_argument("--n_epochs", type=int, default=7, help="Number of epochs")
 parser.add_argument("--epoch_size", type=int, default=1000000, help="Iterations per epoch")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
 parser.add_argument("--map_optimizer", type=str, default="sgd,lr=0.1", help="Mapping optimizer")
@@ -88,8 +88,8 @@ parser.add_argument("--dico_eval_build", type=str, default='S2T', help="S2T,T2S,
 parser.add_argument("--dico_threshold", type=float, default=0, help="Threshold confidence for dictionary generation")
 parser.add_argument("--dico_max_rank", type=int, default=15000, help="Maximum dictionary words rank (0 to disable)")
 parser.add_argument("--dico_min_size", type=int, default=0, help="Minimum generated dictionary size (0 to disable)")
-parser.add_argument("--dico_max_size", type=int, default=10000, help="Maximum generated dictionary size (0 to disable)")
-parser.add_argument("--metric_size", type=int, default=10000, help="size for csls metric")
+parser.add_argument("--dico_max_size", type=int, default=0, help="Maximum generated dictionary size (0 to disable)")
+parser.add_argument("--metric_size", type=int, default=25000, help="size for csls metric")
 # reload pre-trained embeddings
 parser.add_argument("--normalize_embeddings", type=str, default="", help="Normalize embeddings before training")
 
@@ -106,7 +106,7 @@ assert 0 < params.lr_shrink <= 1
 assert params.dico_eval in ['default', 'train'] or os.path.isfile(params.dico_eval)
 assert params.export in ["", "txt", "pth"]
 
-VALIDATION_METRIC = f'mean_cosine-csls_knn_10-{params.dico_eval_build}-{params.dico_max_size}-target'
+VALIDATION_METRIC = f'mean_cosine-csls_knn_10-{params.dico_eval_build}-{params.metric_size}'
 # VALIDATION_METRIC = 'precision_at_1-csls_knn_10'
 
 # build model / trainer / evaluator

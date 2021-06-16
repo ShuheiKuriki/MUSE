@@ -177,7 +177,7 @@ class Evaluator:
         # build dictionary
         for dico_method in ['csls_knn_10']:
             dico_build = self.params.dico_eval_build
-            dico_max_size = self.params.dico_max_size
+            dico_max_size = self.params.metric_size
             # temp params / dictionary generation
             _params = deepcopy(self.params)
             _params.dico_method = dico_method
@@ -196,12 +196,18 @@ class Evaluator:
                 mean_cosine = (src_emb[dico[:dico_max_size, 0]] * tgt_emb[dico[:dico_max_size, 1]]).sum(1).mean()
             mean_cosine = mean_cosine.item() if isinstance(mean_cosine, torch_tensor) else mean_cosine
             logger.info("%s-%s Mean cosine (%s method, %s build, %i max size): %.5f", self.params.langs[i], self.params.langs[j], dico_method, _params.dico_build, dico_max_size, mean_cosine)
+
             metric = f'mean_cosine-{dico_method}-{_params.dico_build}-{dico_max_size}'
-            if self.params.last_eval == 'no_target' and j == self.langnum-1: metric += '-target'
-            if metric in to_log:
-                to_log[metric].append(mean_cosine)
-            else:
-                to_log[metric] = [mean_cosine]
+            metric_all = metric + '-all'
+
+            if metric_all not in to_log: to_log[metric_all] = []
+            to_log[metric_all].append(mean_cosine)
+
+            if self.params.last_eval == 'no_target' and max(i, j) == self.langnum-1:
+                metric += '-target'
+
+            if metric not in to_log: to_log[metric] = []
+            to_log[metric].append(mean_cosine)
 
     def all_eval(self, to_log, eval_type='no_target'):
         """
@@ -229,7 +235,8 @@ class Evaluator:
                 self.word_translation(i, self.langnum-1, to_log)
                 # self.sent_translation(i, self.langnum-1, to_log)
         for i in range(self.langnum):
-            for j in range(i+1, self.langnum): self.dist_mean_cosine(to_log, i, j)
+            for j in range(self.langnum):
+                if i != j: self.dist_mean_cosine(to_log, i, j)
         for k in to_log:
             if isinstance(to_log[k], list): to_log[k] = sum(to_log[k])/len(to_log[k])
 

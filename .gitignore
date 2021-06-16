@@ -5,7 +5,7 @@ vectors/
 *.vec
 joint_align/
 *.txt
-learn*.sh
+sh/
 data/crosslingual
 data/emb_norms
 data/monolingual
