@@ -18,7 +18,7 @@ python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja 
 python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 30000
 ```
 
-# データセット
+## データセット
 英語を含まない言語ペアで評価を行う場合
 https://github.com/ccsasuke/umwe からデータを持ってきます。
 このリポジトリの1個上の階層に以下をcloneする。
@@ -30,7 +30,7 @@ git clone https://github.com/ccsasuke/umwe.git
 python src/organize_dicts.py
 ```
 
-# VecMap
+## VecMap
 MUSEのデータセットでVecMapを実験できるようにした。
 ```
 cd vecmap
