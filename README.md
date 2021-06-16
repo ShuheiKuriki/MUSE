@@ -3,7 +3,6 @@
 * unsupervised.py : 普遍空間を用いない通常のMAT+MPSR
 * learn_univ.py : Universal Concept Embeddingsを用いた多言語学習
 * get_neighbor.py : 普遍空間の各ベクトルの近傍単語を取得する(最近動作確認してない)
-* 
 
 learn_univ.pyにおいて重要なオプション
 * ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数 →　言語数//2に固定しました。
@@ -32,7 +31,7 @@ python src/organize_dicts.py
 ```
 
 ## VecMap
-MUSEのデータセットでVecMapを実験できるようにした。
+MUSEのデータセットでVecMap https://github.com/artetxem/vecmap のUnsupervisedを実験できるようにした。
 ```
 cd vecmap
 bash vecmap.sh
