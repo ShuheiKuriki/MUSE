@@ -19,8 +19,8 @@ python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr
 ```
 
 ## データセット
-英語を含む言語ペアかヨーロッパ言語で評価を行う場合はページ下の英文箇所を参考にデータセットを初期化。
-それ以外の言語ペアで評価を行う場合　https://github.com/ccsasuke/umwe から評価用辞書を持ってきます。
+まずはページ下の英文箇所を参考にデータセットを初期化。
+英語を含む言語ペアかヨーロッパ言語以外で評価を行う場合、　https://github.com/ccsasuke/umwe から評価用辞書を持ってきます。
 まず、このリポジトリの1個上の階層に以下をcloneする。
 ```
 git clone https://github.com/ccsasuke/umwe.git
