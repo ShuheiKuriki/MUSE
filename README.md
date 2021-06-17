@@ -1,10 +1,11 @@
-## 6/16現在のmat_mpsrブランチの状況
+# Universal Concept Embeddings(6/17更新)
+
 * supervised.py : 辞書を利用する教師あり学習，教師ありでもmpsrのプロセスが導入されている．既存のものからややアレンジしています。
 * unsupervised.py : 普遍空間を用いない通常のMAT+MPSR
 * learn_univ.py : Universal Concept Embeddingsを用いた多言語学習
 * get_neighbor.py : 普遍空間の各ベクトルの近傍単語を取得する(最近動作確認してない)
 
-learn_univ.pyにおいて重要なオプション
+## learn_univ.pyにおいて重要なオプション
 * ref_tgt : mpsrステップにおいて、実言語1回に対して普遍空間を学習する回数 →　言語数//2に固定しました。
 * univ_vocab : 普遍空間の単語数。適正値は言語数に比例するという仮説を立てている。
 * dico_build : 対応単語ペア集合の作り方を規定、最適化の対象となる単語ペアが変わる。S2T&T2Sが基本的に良いが、文脈ありではどうなるか？
@@ -18,20 +19,30 @@ python learn_univ.py --exp_name twos/en-ja/univ --exp_id mat-mpsr --langs en ja 
 python learn_univ.py --exp_name sixes/univ --exp_id mat-mpsr --langs de en es fr it pt random --device cuda:0 --ref_tgt 3 --univ_vocab 30000
 ```
 
-## データセット
-まずはページ下の英文箇所を参考にデータセットを初期化。
-英語を含む言語ペアかヨーロッパ言語以外で評価を行う場合、　https://github.com/ccsasuke/umwe から評価用辞書を持ってきます。
-まず、このリポジトリの1個上の階層に以下をcloneする。
+## データセット初期化
+ページ下の英文箇所を参考にデータセットを初期化
+
+## 「英語を含む言語ペアかヨーロッパ言語同士」以外で評価を行う場合
+https://github.com/ccsasuke/umwe から評価用辞書を取ってきて整形する。
+まず、このリポジトリの1個上の階層で以下を実行。
 ```
 git clone https://github.com/ccsasuke/umwe.git
 ```
-その上で、欲しい言語に合わせて以下のファイルを編集し、実行する。
+その上で、実験したい言語に合わせてsrc/organize_dicts.pyを編集し、以下を実行。
 ```
 python src/organize_dicts.py
 ```
 
+## europarlのコーパスからaligned corpusを得たい場合
+data/align_europarl.shのファイルを実験したい言語に合わせて編集した上で以下を実行。
+```
+cd data
+bash align_europarl.sh
+```
+
 ## VecMap
-MUSEのデータセットでVecMap https://github.com/artetxem/vecmap のUnsupervisedを実験できるようにした。
+MUSEのデータセットでVecMap https://github.com/artetxem/vecmap のUnsupervisedを実験する場合。
+学習したい言語に合わせてvecmap/vecmap.shを編集した上で以下を実行。
 ```
 cd vecmap
 bash vecmap.sh
