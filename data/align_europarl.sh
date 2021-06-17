@@ -1,24 +1,23 @@
 #!/bin/bash
 set -e
 
-# TOOLS=tools
-# mkdir -p $TOOLS
+mkdir ./crosslingual/aligned_europarl
+TOOLS=tools
+mkdir -p $TOOLS
 
-# cd $TOOLS
+cd $TOOLS
 
-fast_align
+# fast_align
 git clone https://github.com/clab/fast_align
 cd fast_align
 mkdir build
 cd build
 cmake ..
 make
-cd ..
-
+cd ../../..
 set -e
 
-mkdir -p cache
-
+# L1, L2のリストを実験したい言語に合わせて編集
 for L1 in en
 do
     for L2 in bg el de es fr
